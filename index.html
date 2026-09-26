@@ -6,7 +6,7 @@
 <title>Piutang Gatsu</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
@@ -38,6 +38,8 @@
     --radius: 10px;
     --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+    --serif: 'IBM Plex Serif', Georgia, 'Times New Roman', serif;
+    --header-grad: linear-gradient(120deg, #FCF4F1 0%, #F6F2F8 50%, #F1F4FB 100%);
   }
   :root:not([data-theme="light"]) {
     @media (prefers-color-scheme: dark) {
@@ -155,6 +157,20 @@
   .syncline.live .dot { background: #2E9E5B; }
   .syncline.stale .dot { background: var(--cat-14); }
   .syncline.error .dot { background: var(--cat-over); }
+  .syncrow { display: flex; align-items: center; gap: 12px; margin: 0 0 22px; flex-wrap: wrap; }
+  .syncrow .syncline { margin: 0; }
+  .refresh-btn {
+    appearance: none; border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); font-family: var(--sans); font-size: 12px;
+    padding: 5px 10px; border-radius: 999px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .refresh-btn:hover { border-color: var(--ink); color: var(--ink); }
+  .refresh-btn:disabled { opacity: 0.5; cursor: default; }
+  .refresh-icon { display: inline-block; transition: transform .5s ease; }
+  .refresh-btn.spinning .refresh-icon { animation: spin 0.8s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   .hero {
     display: grid;
@@ -286,7 +302,12 @@
     <span><strong>PT. Perintis Perkasa</strong> &middot; Cabang Gatsu</span>
     <span id="todayLabel"></span>
   </div>
-  <div class="syncline" id="syncline">Memuat status sinkronisasi&hellip;</div>
+  <div class="syncrow">
+    <div class="syncline" id="syncline">Memuat status sinkronisasi&hellip;</div>
+    <button type="button" class="refresh-btn" id="refreshBtn" title="Segarkan sekarang">
+      <span class="refresh-icon">&#8635;</span> Segarkan
+    </button>
+  </div>
 
   <div class="tabs" id="tabs">
     <button class="tab active" data-tab="umur">Umur Piutang</button>
@@ -361,7 +382,9 @@
 
 <script>
 
-const RAW = [{"noCust": "A0010662GOR", "nama": "PT.GO RENTAL", "faktur": "000007/FKT/PP/0826", "top": 0, "tglJto": "2026-08-03", "jumlah": 472950000.0, "type": "KIJANG INNOVA ZENIX 2.0 V CVT", "cara": "Tunai", "leasing": "Cash", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "ERWIN LIE", "tglTagih": "Kontrak Go Rental", "tglBarcode": "2026-08-03", "followup": "Estimasi pelunasan senin 10/08/26"}, {"noCust": "A0010662GOR", "nama": "PT.GO RENTAL", "faktur": "000026/FKT/PP/0826", "top": 0, "tglJto": "2026-08-06", "jumlah": 472950000.0, "type": "KIJANG INNOVA ZENIX 2.0 V CVT", "cara": "Tunai", "leasing": "Cash", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "ERWIN LIE", "tglTagih": "Kontrak Go Rental", "tglBarcode": "2026-08-06", "followup": "Estimasi pelunasan senin 10/08/26"}, {"noCust": "A0032444CJF", "nama": "CONNY J F MATULLESSYA DRA", "faktur": "000072/FKT/PP/0926", "top": 0, "tglJto": "2026-09-10", "jumlah": 243810000.0, "type": "RUSH 1.5 S M/T GR SPORT", "cara": "Kredit", "leasing": "TAF", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "JIMMY", "tglTagih": "2026-09-11", "tglBarcode": "2026-09-10", "followup": "Valid hari ini Tgl 7.8.26"}, {"noCust": "A0032065KMB", "nama": "PT.KINANTAN MAJU BERSAMA", "faktur": "000080/FKT/PP/0926", "top": 0, "tglJto": "2026-09-11", "jumlah": 187276460.0, "type": "AVANZA 1.3 E CVT", "cara": "Kredit", "leasing": "KKB", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "WARIMIN", "tglTagih": "2026-09-12", "tglBarcode": "2026-09-11", "followup": "Valid senin Tgl 10.8.26"}, {"noCust": "A0032468GSS", "nama": "GERHANI SUN SIANTURI", "faktur": "000095/FKT/PP/0926", "top": 0, "tglJto": "2026-09-14", "jumlah": 149622000.0, "type": "RUSH 1.5 S A/T GR SPORT", "cara": "Kredit", "leasing": "TAF", "salesman": "LOLA PUTRI PERDANA SAING", "supervisor": "WARIMIN", "tglTagih": "2026-09-16", "tglBarcode": "2026-09-15", "followup": "Estimasi pelunasan senin 10/08/26"}, {"noCust": "A0032475JAM", "nama": "JENRI AMBARITA", "faktur": "000102/FKT/PP/0926", "top": 0, "tglJto": "2026-09-15", "jumlah": 158550000.0, "type": "RUSH 1.5 S A/T GR SPORT", "cara": "Kredit", "leasing": "TAF", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "WARIMIN", "tglTagih": "2026-09-16", "tglBarcode": "2026-09-15", "followup": "Tagihan Diambil TAF 06/08/26"}, {"noCust": "A0032485RSM", "nama": "ROSMALINI LUBIS", "faktur": "000106/FKT/PP/0926", "top": 0, "tglJto": "2026-09-15", "jumlah": 217400000.0, "type": "AVANZA 1.5 G M/T", "cara": "Kredit", "leasing": "TAF", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "WARIMIN", "tglTagih": "2026-09-17", "tglBarcode": "2026-09-15", "followup": "Estimasi pelunasan jumat 07/08/26"}, {"noCust": "A0032487HER", "nama": "HERNI", "faktur": "000109/FKT/PP/0926", "top": 0, "tglJto": "2026-09-16", "jumlah": 133776900.0, "type": "AVANZA 1.5 G CVT", "cara": "Kredit", "leasing": "TAF", "salesman": "MARZUKI", "supervisor": "TENGKU HARIS", "tglTagih": "2026-09-17", "tglBarcode": "2026-09-16", "followup": "Update Leasing Sudah Valid"}, {"noCust": "A0032503SAR", "nama": "SARIANA", "faktur": "000125/FKT/PP/0926", "top": 0, "tglJto": "2026-09-18", "jumlah": 250900000.0, "type": "RAIZE 1.0T GR SPORT CVT TWO TONE", "cara": "Kredit", "leasing": "ACC", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-21", "tglBarcode": "2026-09-18", "followup": "Tagihan diambil 13/08/26"}, {"noCust": "A0023478MII", "nama": "MUHAMMAD SANI", "faktur": "000130/FKT/PP/0926", "top": 0, "tglJto": "2026-09-18", "jumlah": 164550000.0, "type": "CALYA 1.2 G M/T", "cara": "Kredit", "leasing": "ACC", "salesman": "RAHADIAN FITRIANSYAH", "supervisor": "JIMMY", "tglTagih": "2026-09-19", "tglBarcode": "2026-09-18", "followup": "Tagihan diambil 13/08/26"}, {"noCust": "A0028405TJI", "nama": "TJIOE KOK", "faktur": "000132/FKT/PP/0926", "top": 0, "tglJto": "2026-09-18", "jumlah": 1128760200.0, "type": "ALPHARD 2.5 HYBRID CVT", "cara": "Kredit", "leasing": "KKB", "salesman": "AGUSTONO SUSANTO", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-18", "tglBarcode": "2026-09-18", "followup": "Tagihan diambil 13/08/26"}, {"noCust": "A0032514FRT", "nama": "FITRI RAHMAYANI TAMBUNAN", "faktur": "000135/FKT/PP/0926", "top": 0, "tglJto": "2026-09-18", "jumlah": 148900000.0, "type": "AGYA 1.2 G CVT", "cara": "Kredit", "leasing": "TAF", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "TENGKU HARIS", "tglTagih": "2026-09-18", "tglBarcode": "2026-09-18", "followup": "Tagihan diambil 13/08/26"}, {"noCust": "A0032449AND", "nama": "ANDRYAN", "faktur": "000140/FKT/PP/0926", "top": 0, "tglJto": "2026-09-18", "jumlah": 320100000.0, "type": "KIJANG INNOVA 2.4 G M/T", "cara": "Kredit", "leasing": "ACC", "salesman": "MOHD.TAUPIQ", "supervisor": "SOFRI GUNAWAN", "tglTagih": "2026-09-21", "tglBarcode": "2026-09-18", "followup": "Tagihan diambil 13/08/26"}, {"noCust": "A0032518SUS", "nama": "SUSANTO", "faktur": "000147/FKT/PP/0926", "top": 0, "tglJto": "2026-09-19", "jumlah": 220000000.0, "type": "KIJANG INNOVA 2.4 G A/T", "cara": "Kredit", "leasing": "KKB", "salesman": "AGUSTONO SUSANTO", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-21", "tglBarcode": "2026-09-19", "followup": "Tagihan diambil 13/08/26"}, {"noCust": "A0011491IWS", "nama": "ISMAIL MANGUNSONG", "faktur": "000161/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 321700000.0, "type": "KIJANG INNOVA 2.4 G A/T", "cara": "Kredit", "leasing": "TAF", "salesman": "MARZUKI", "supervisor": "TENGKU HARIS", "tglTagih": "2026-09-22", "tglBarcode": "2026-09-21", "followup": "Plan Valid 21/08/2026"}, {"noCust": "A0032451LHA", "nama": "LISNAN HASIBUAN", "faktur": "000162/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 231200000.0, "type": "RUSH 1.5 S A/T GR SPORT", "cara": "Kredit", "leasing": "TAF", "salesman": "IAN MARTIN TARIGAN", "supervisor": "WARIMIN", "tglTagih": "2026-09-22", "tglBarcode": "2026-09-21", "followup": "Plan Pelunasan 28/08/2026"}, {"noCust": "A0028649FIK", "nama": "MUHAMMAD FIKRI", "faktur": "000164/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 209680000.0, "type": "AVANZA 1.3 E CVT", "cara": "Kredit", "leasing": "ACC", "salesman": "RAIS MAULANA", "supervisor": "JIMMY", "tglTagih": "2026-09-21", "tglBarcode": "2026-09-21", "followup": "Proses Valid 28/08/2026"}, {"noCust": "A0031317ROS", "nama": "ROSMAWATI SIBURIAN", "faktur": "000172/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 178200000.0, "type": "RAIZE 1.0T GR SPORT CVT ONE TONE", "cara": "Kredit", "leasing": "TAF", "salesman": "ANDRYANTO OMPUSUNGGU", "supervisor": "JIMMY", "tglTagih": "2026-09-22", "tglBarcode": "2026-09-21", "followup": "Proses Valid"}, {"noCust": "A0026127BIN", "nama": "PT.BELAWAN INDAH", "faktur": "000176/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 212274575.0, "type": "VELOZ 1.5 V HYBRID CVT", "cara": "Kredit", "leasing": "KKB", "salesman": "AGUSTONO SUSANTO", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-23", "tglBarcode": "2026-09-22", "followup": "Proses Valid"}, {"noCust": "A0032534ADF", "nama": "ADRIAN DWI FIRMANSYAH", "faktur": "000177/FKT/PP/0926", "top": 0, "tglJto": "2026-09-22", "jumlah": 211410000.0, "type": "AVANZA 1.5 G CVT", "cara": "Kredit", "leasing": "TAF", "salesman": "MAYA SARI", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-24", "tglBarcode": "2026-09-23", "followup": "Plan Pelunasan 08/09/2026"}, {"noCust": "A0032533GLA", "nama": "PT.GLARAGE LARIS AUTO MAKMUR", "faktur": "000178/FKT/PP/0926", "top": 0, "tglJto": "2026-09-22", "jumlah": 142503717.0, "type": "CALYA 1.2 G A/T", "cara": "Kredit", "leasing": "KKB", "salesman": "AGUSTONO SUSANTO", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-22", "tglBarcode": "2026-09-22", "followup": "Plan Valid 08/09/2026 (Plan Pelunasan 09/09/2026)"}, {"noCust": "A0032436DAN", "nama": "DANI SURYARMAN DAMANIK", "faktur": "000179/FKT/PP/0926", "top": 0, "tglJto": "2026-09-22", "jumlah": 80600000.0, "type": "CALYA 1.2 G M/T", "cara": "Kredit", "leasing": "TAF", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "JIMMY", "tglTagih": "2026-09-23", "tglBarcode": "2026-09-22", "followup": "Plan Valid 08/09/2026 (Plan Pelunasan 09/09/2026)"}, {"noCust": "A0032525ENO", "nama": "ENONIA HIA", "faktur": "000180/FKT/PP/0926", "top": 0, "tglJto": "2026-09-22", "jumlah": 178206000.0, "type": "RUSH 1.5 S M/T GR SPORT", "cara": "Kredit", "leasing": "BUANA", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "JIMMY", "tglTagih": "2026-09-22", "tglBarcode": "2026-09-22", "followup": "Plan Pelunasan 16/09/2026"}, {"noCust": "A0032548DTO", "nama": "DAVID TONO", "faktur": "000185/FKT/PP/0926", "top": 0, "tglJto": "2026-09-22", "jumlah": 302000000.0, "type": "KIJANG INNOVA ZENIX 2.0 V HV CVT MODELISTA", "cara": "Kredit", "leasing": "KKB", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "SOFRI GUNAWAN", "tglTagih": "2026-09-23", "tglBarcode": "2026-09-23", "followup": "Proses Valid (Tagihan Baru Diterima)"}, {"noCust": "A0022940MGF", "nama": "MUHAMMAD GANDHI FAISAL SIREGAR", "faktur": "000188/FKT/PP/0926", "top": 0, "tglJto": "2026-09-23", "jumlah": 404599000.0, "type": "HIACE PREMIO 2.8 M/T", "cara": "Kredit", "leasing": "BUANA", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "JIMMY", "tglTagih": "Belum Buat Tagihan", "tglBarcode": "-", "followup": "Plan Pelunasan 21/09/2026"}, {"noCust": "A0032553HEN", "nama": "HENRY SITOMPUL", "faktur": "000197/FKT/PP/0926", "top": 0, "tglJto": "2026-09-24", "jumlah": 237021860.0, "type": "VELOZ 1.5 Q HYBRID CVT MODELLISTA", "cara": "Kredit", "leasing": "BRIM", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-24", "tglBarcode": "2026-09-24", "followup": "Plan Pelunasan 24/09/2026"}, {"noCust": "A0024824MUS", "nama": "MUSTAFA KAMAL", "faktur": "000199/FKT/PP/0926", "top": 0, "tglJto": "2026-09-24", "jumlah": 343600000.0, "type": "KIJANG INNOVA 2.4 G A/T", "cara": "Kredit", "leasing": "ACC", "salesman": "RIDWANSYAH", "supervisor": "WARIMIN", "tglTagih": "Belum Buat Tagihan", "tglBarcode": "2026-09-24", "followup": "Plan Pelunasan 24/09/2026"}, {"noCust": "A0032561RTA", "nama": "RANDY TANDRA", "faktur": "000202/FKT/PP/0926", "top": 0, "tglJto": "2026-09-24", "jumlah": 343414239.0, "type": "KIJANG INNOVA ZENIX 2.0 G HV CVT", "cara": "Kredit", "leasing": "KKB", "salesman": "JOHAN", "supervisor": "JHONI WONG", "tglTagih": "Belum Buat Tagihan", "tglBarcode": "2026-09-24", "followup": "Plan Pelunasan 25/09/2026"}]
+const REPORT_DATE_LABEL_INITIAL = "Per : 26-Sep-2026";
+let REPORT_DATE_LABEL = REPORT_DATE_LABEL_INITIAL;
+const RAW = [{"noCust": "A0010662GOR", "nama": "PT.GO RENTAL", "faktur": "000007/FKT/PP/0826", "top": 0, "tglJto": "2026-08-03", "jumlah": 472950000.0, "type": "KIJANG INNOVA ZENIX 2.0 V CVT", "cara": "Tunai", "leasing": "Cash", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "ERWIN LIE", "tglTagih": "Kontrak Go Rental", "tglBarcode": "2026-08-03", "followup": null}, {"noCust": "A0010662GOR", "nama": "PT.GO RENTAL", "faktur": "000026/FKT/PP/0826", "top": 0, "tglJto": "2026-08-06", "jumlah": 472950000.0, "type": "KIJANG INNOVA ZENIX 2.0 V CVT", "cara": "Tunai", "leasing": "Cash", "salesman": "SALINDO DOMINGGOS RAJAGUKGUK", "supervisor": "ERWIN LIE", "tglTagih": "Kontrak Go Rental", "tglBarcode": "2026-08-06", "followup": null}, {"noCust": "A0022940MGF", "nama": "MUHAMMAD GANDHI FAISAL SIREGAR", "faktur": "000188/FKT/PP/0926", "top": 0, "tglJto": "2026-09-23", "jumlah": 404599000.0, "type": "HIACE PREMIO 2.8 M/T", "cara": "Kredit", "leasing": "BUANA", "salesman": "SEPITEMA WARUWU", "supervisor": "JIMMY", "tglTagih": "Belum Buat Tagihan", "tglBarcode": "-", "followup": null}, {"noCust": "A0023478MII", "nama": "MUHAMMAD SANI", "faktur": "000130/FKT/PP/0926", "top": 0, "tglJto": "2026-09-18", "jumlah": 164550000.0, "type": "CALYA 1.2 G M/T", "cara": "Kredit", "leasing": "ACC", "salesman": "RAHADIAN FITRIANSYAH", "supervisor": "JIMMY", "tglTagih": "2026-09-19", "tglBarcode": "2026-09-18", "followup": null}, {"noCust": "A0024824MUS", "nama": "MUSTAFA KAMAL", "faktur": "000199/FKT/PP/0926", "top": 0, "tglJto": "2026-09-24", "jumlah": 343600000.0, "type": "KIJANG INNOVA 2.4 G A/T", "cara": "Kredit", "leasing": "ACC", "salesman": "RIDWANSYAH", "supervisor": "WARIMIN", "tglTagih": "2026-09-25", "tglBarcode": "2026-09-24", "followup": null}, {"noCust": "A0026127BIN", "nama": "PT.BELAWAN INDAH", "faktur": "000176/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 212274575.0, "type": "VELOZ 1.5 V HYBRID CVT", "cara": "Kredit", "leasing": "KKB", "salesman": "AGUSTONO SUSANTO", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-23", "tglBarcode": "2026-09-22", "followup": null}, {"noCust": "A0028405TJI", "nama": "TJIOE KOK", "faktur": "000132/FKT/PP/0926", "top": 0, "tglJto": "2026-09-18", "jumlah": 1128760200.0, "type": "ALPHARD 2.5 HYBRID CVT", "cara": "Kredit", "leasing": "KKB", "salesman": "AGUSTONO SUSANTO", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-18", "tglBarcode": "2026-09-18", "followup": null}, {"noCust": "A0028649FIK", "nama": "MUHAMMAD FIKRI", "faktur": "000164/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 209680000.0, "type": "AVANZA 1.3 E CVT", "cara": "Kredit", "leasing": "ACC", "salesman": "RAIS MAULANA", "supervisor": "JIMMY", "tglTagih": "2026-09-21", "tglBarcode": "2026-09-21", "followup": null}, {"noCust": "A0031317ROS", "nama": "ROSMAWATI SIBURIAN", "faktur": "000172/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 178200000.0, "type": "RAIZE 1.0T GR SPORT CVT ONE TONE", "cara": "Kredit", "leasing": "TAF", "salesman": "ANDRYANTO OMPUSUNGGU", "supervisor": "JIMMY", "tglTagih": "2026-09-22", "tglBarcode": "2026-09-21", "followup": null}, {"noCust": "A0032065KMB", "nama": "PT.KINANTAN MAJU BERSAMA", "faktur": "000080/FKT/PP/0926", "top": 0, "tglJto": "2026-09-11", "jumlah": 187276460.0, "type": "AVANZA 1.3 E CVT", "cara": "Kredit", "leasing": "KKB", "salesman": "MHD AULIA RIZKI", "supervisor": "WARIMIN", "tglTagih": "2026-09-12", "tglBarcode": "2026-09-11", "followup": null}, {"noCust": "A0032436DAN", "nama": "DANI SURYARMAN DAMANIK", "faktur": "000179/FKT/PP/0926", "top": 0, "tglJto": "2026-09-22", "jumlah": 80600000.0, "type": "CALYA 1.2 G M/T", "cara": "Kredit", "leasing": "TAF", "salesman": "RIDHO ZUNAIDI", "supervisor": "JIMMY", "tglTagih": "2026-09-23", "tglBarcode": "2026-09-22", "followup": null}, {"noCust": "A0032444CJF", "nama": "CONNY J F MATULLESSYA DRA", "faktur": "000072/FKT/PP/0926", "top": 0, "tglJto": "2026-09-10", "jumlah": 243810000.0, "type": "RUSH 1.5 S M/T GR SPORT", "cara": "Kredit", "leasing": "TAF", "salesman": "SUHANDA", "supervisor": "JIMMY", "tglTagih": "2026-09-11", "tglBarcode": "2026-09-10", "followup": "Plan Pelunasan 24/09/2026"}, {"noCust": "A0032451LHA", "nama": "LISNAN HASIBUAN", "faktur": "000162/FKT/PP/0926", "top": 0, "tglJto": "2026-09-21", "jumlah": 231200000.0, "type": "RUSH 1.5 S A/T GR SPORT", "cara": "Kredit", "leasing": "TAF", "salesman": "IAN MARTIN TARIGAN", "supervisor": "WARIMIN", "tglTagih": "2026-09-22", "tglBarcode": "2026-09-21", "followup": null}, {"noCust": "A0032468GSS", "nama": "GERHANI SUN SIANTURI", "faktur": "000095/FKT/PP/0926", "top": 0, "tglJto": "2026-09-14", "jumlah": 149622000.0, "type": "RUSH 1.5 S A/T GR SPORT", "cara": "Kredit", "leasing": "TAF", "salesman": "LOLA PUTRI PERDANA SAING", "supervisor": "WARIMIN", "tglTagih": "2026-09-16", "tglBarcode": "2026-09-15", "followup": "Plan Pelunasan 24/09/2026"}, {"noCust": "A0032475JAM", "nama": "JENRI AMBARITA", "faktur": "000102/FKT/PP/0926", "top": 0, "tglJto": "2026-09-15", "jumlah": 158550000.0, "type": "RUSH 1.5 S A/T GR SPORT", "cara": "Kredit", "leasing": "TAF", "salesman": "HANS BONA PARTOGI PASARIBU", "supervisor": "WARIMIN", "tglTagih": "2026-09-16", "tglBarcode": "2026-09-15", "followup": "Plan Pelunasan 24/09/2026"}, {"noCust": "A0032485RSM", "nama": "ROSMALINI LUBIS", "faktur": "000106/FKT/PP/0926", "top": 0, "tglJto": "2026-09-15", "jumlah": 217400000.0, "type": "AVANZA 1.5 G M/T", "cara": "Kredit", "leasing": "TAF", "salesman": "FELIX OPELWIN SIMBOLON", "supervisor": "WARIMIN", "tglTagih": "2026-09-17", "tglBarcode": "2026-09-15", "followup": "Plan Pelunasan 25/09/2026"}, {"noCust": "A0032487HER", "nama": "HERNI", "faktur": "000109/FKT/PP/0926", "top": 0, "tglJto": "2026-09-16", "jumlah": 133776900.0, "type": "AVANZA 1.5 G CVT", "cara": "Kredit", "leasing": "TAF", "salesman": "MARZUKI", "supervisor": "TENGKU HARIS", "tglTagih": "2026-09-17", "tglBarcode": "2026-09-16", "followup": "Plan Pelunasan 25/09/2026"}, {"noCust": "A0032514FRT", "nama": "FITRI RAHMAYANI TAMBUNAN", "faktur": "000135/FKT/PP/0926", "top": 0, "tglJto": "2026-09-18", "jumlah": 148900000.0, "type": "AGYA 1.2 G CVT", "cara": "Kredit", "leasing": "TAF", "salesman": "NURDIANSYAH PUTRA", "supervisor": "TENGKU HARIS", "tglTagih": "2026-09-18", "tglBarcode": "2026-09-18", "followup": "Plan Pelunasan 25/09/2026"}, {"noCust": "A0032518SUS", "nama": "SUSANTO", "faktur": "000147/FKT/PP/0926", "top": 0, "tglJto": "2026-09-19", "jumlah": 220000000.0, "type": "KIJANG INNOVA 2.4 G A/T", "cara": "Kredit", "leasing": "KKB", "salesman": "AGUSTONO SUSANTO", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-21", "tglBarcode": "2026-09-19", "followup": null}, {"noCust": "A0032534ADF", "nama": "ADRIAN DWI FIRMANSYAH", "faktur": "000177/FKT/PP/0926", "top": 0, "tglJto": "2026-09-22", "jumlah": 211410000.0, "type": "AVANZA 1.5 G CVT", "cara": "Kredit", "leasing": "TAF", "salesman": "MAYA SARI", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-24", "tglBarcode": "2026-09-23", "followup": null}, {"noCust": "A0032548DTO", "nama": "DAVID TONO", "faktur": "000185/FKT/PP/0926", "top": 0, "tglJto": "2026-09-22", "jumlah": 302000000.0, "type": "KIJANG INNOVA ZENIX 2.0 V HV CVT MODELISTA", "cara": "Kredit", "leasing": "KKB", "salesman": "ANITA ST", "supervisor": "SOFRI GUNAWAN", "tglTagih": "2026-09-23", "tglBarcode": "2026-09-23", "followup": null}, {"noCust": "A0032553HEN", "nama": "HENRY SITOMPUL", "faktur": "000197/FKT/PP/0926", "top": 0, "tglJto": "2026-09-24", "jumlah": 237021860.0, "type": "VELOZ 1.5 Q HYBRID CVT MODELLISTA", "cara": "Kredit", "leasing": "BRIM", "salesman": "HAMZAH NAULI DAULAY", "supervisor": "ERWIN LIE", "tglTagih": "2026-09-24", "tglBarcode": "2026-09-24", "followup": null}, {"noCust": "A0032561RTA", "nama": "RANDY TANDRA", "faktur": "000202/FKT/PP/0926", "top": 0, "tglJto": "2026-09-24", "jumlah": 343414239.0, "type": "KIJANG INNOVA ZENIX 2.0 G HV CVT", "cara": "Kredit", "leasing": "KKB", "salesman": "JOHAN", "supervisor": "JHONI WONG", "tglTagih": "Belum Buat Tagihan", "tglBarcode": "2026-09-24", "followup": null}, {"noCust": "A0032586FRE", "nama": "FRENGKY SIMARMATA", "faktur": "000215/FKT/PP/0926", "top": 0, "tglJto": "2026-09-25", "jumlah": 300000000.0, "type": "HILUX DOUBLE CABIN 2.8 V (4X4) A/T", "cara": "Kredit", "leasing": "TAF", "salesman": "NURDIN NASUTION", "supervisor": "ERWIN LIE", "tglTagih": "Belum Buat Tagihan", "tglBarcode": "2026-09-25", "followup": null}, {"noCust": "C0000904MPS", "nama": "MUSLIM PANGIHUTAN SIDABUTAR", "faktur": "000212/FKT/PP/0926", "top": 0, "tglJto": "2026-09-25", "jumlah": 328300000.0, "type": "KIJANG INNOVA 2.4 G M/T", "cara": "Kredit", "leasing": "ACC", "salesman": "RICCA ASTIKA", "supervisor": "COUNTER", "tglTagih": "2026-09-25", "tglBarcode": "2026-09-25", "followup": null}, {"noCust": "C0007602NUR", "nama": "NURMARIAH LIMBONG SKM", "faktur": "000216/FKT/PP/0926", "top": 0, "tglJto": "2026-09-25", "jumlah": 485700000.0, "type": "FORTUNER 2.8 VRZ TSS 4X2 A/T", "cara": "Kredit", "leasing": "ACC", "salesman": "RAHADIAN FITRIANSYAH", "supervisor": "JIMMY", "tglTagih": "Belum Buat Tagihan", "tglBarcode": "-", "followup": null}]
 
 ;
 
@@ -423,8 +446,7 @@ function fmtDateShort(s) {
   return d.getDate() + " " + bulan[d.getMonth()] + " " + d.getFullYear();
 }
 
-document.getElementById('todayLabel').textContent =
-  "Per " + fmtDateShort(today.toISOString().slice(0,10));
+document.getElementById('todayLabel').textContent = REPORT_DATE_LABEL;
 
 let activeFilter = "all";
 let searchTerm = "";
@@ -687,80 +709,61 @@ function cellVal(ws, colLetter, r) {
 }
 
 function extractGatsuFromWorkbook(wb) {
-  const ws = wb.Sheets["Data"];
-  if (!ws || !ws['!ref']) throw new Error("Sheet 'Data' tidak ditemukan");
+  const ws = wb.Sheets["Sheet1"];
+  if (!ws || !ws['!ref']) throw new Error("Sheet 'Sheet1' tidak ditemukan");
   const range = XLSX.utils.decode_range(ws['!ref']);
 
-  // 0) global "CODE=Nama Lengkap" dictionary, scanned from columns L, N, Z (scattered across the sheet)
-  const codeToName = new Map();
-  for (const colLetter of ['L', 'N', 'Z']) {
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      const v = cellVal(ws, colLetter, r);
-      if (typeof v === 'string' && v.includes('=')) {
-        const idx = v.indexOf('=');
-        const code = v.slice(0, idx).trim();
-        const name = v.slice(idx + 1).trim();
-        if (code && name && !codeToName.has(code)) codeToName.set(code, name);
-      }
-    }
-  }
-  function resolveSalesman(code) {
-    if (!code) return code;
-    return codeToName.get(String(code).trim()) || code;
-  }
+  // Baris 4 (index 3) berisi label "Per : DD-Mmm-YYYY" persis seperti yang tertulis di spreadsheet.
+  let reportDateLabel = REPORT_DATE_LABEL;
+  const a4 = cellVal(ws, 'A', 3);
+  if (typeof a4 === 'string' && a4.trim() !== "") reportDateLabel = a4.trim();
 
-  // 1) lookup Faktur No. -> Divisi/CaraPembelian/StatusFnc/Supervisor/Namabrg
-  const lookup = new Map();
-  for (let r = range.s.r; r <= range.e.r; r++) {
-    const c = cellVal(ws, 'C', r);
-    const g = cellVal(ws, 'G', r);
-    if (c == null && g == null) continue;
-    const rec = {
-      caraPembelian: cellVal(ws, 'H', r),
-      divisi: cellVal(ws, 'J', r),
-      statusFnc: cellVal(ws, 'K', r),
-      supervisor: cellVal(ws, 'M', r),
-      namabrg: cellVal(ws, 'F', r),
-    };
-    if (c != null) { const k = String(c).trim(); if (!lookup.has(k)) lookup.set(k, rec); }
-    if (g != null) { const k = String(g).trim(); if (!lookup.has(k)) lookup.set(k, rec); }
-  }
-
-  // 2) piutang rows: AI..AS + AY
+  // Sheet1 adalah laporan final: sudah mengecualikan faktur yang lunas dan sudah
+  // menghitung Divisi/Leasing/Salesman dengan benar. Kolom: A=No, B=No.Cust,
+  // C=Nama Debitur, D=Faktur No., E=TOP, F=Tgl.Jto, G=Jumlah, H=Giro, I=Type,
+  // J=Divisi, K=Cara Pembelian, L=Leasing, M=Salesman ("KODE=Nama Lengkap"),
+  // N=Supervisor, O=Tgl Buat Tagihan, P=Tgl Barcode, Q=Hasil Followup.
   const out = [];
-  for (let r = range.s.r; r <= range.e.r; r++) {
-    const ai = cellVal(ws, 'AI', r);
-    if (ai == null || ai === "") continue;
-    const faktur = cellVal(ws, 'AK', r);
-    const key = faktur != null ? String(faktur).trim() : "";
-    const lk = lookup.get(key) || {};
-    if (lk.divisi !== "Gatsu") continue; // dashboard ini khusus Gatsu
+  for (let r = range.s.r + 9; r <= range.e.r; r++) { // baris data dimulai dari baris ke-10 (index 9)
+    const nama = cellVal(ws, 'C', r);
+    if (nama == null || nama === "") continue; // lewati baris kosong/sisa template & baris "Total:"
+    const divisi = cellVal(ws, 'J', r);
+    if (divisi !== "Gatsu") continue; // dashboard ini khusus Gatsu
 
-    const leasing = cellVal(ws, 'AP', r) || lk.statusFnc || "-";
+    let salesman = cellVal(ws, 'M', r);
+    if (typeof salesman === 'string' && salesman.includes('=')) {
+      salesman = salesman.slice(salesman.indexOf('=') + 1).trim();
+    }
+    const followupRaw = cellVal(ws, 'Q', r);
+
     out.push({
-      noCust: ai,
-      nama: cellVal(ws, 'AJ', r),
-      faktur: faktur,
-      top: cellVal(ws, 'AL', r) || 0,
-      tglJto: isoFromExcelDate(cellVal(ws, 'AM', r)),
-      jumlah: cellVal(ws, 'AN', r) || 0,
-      type: lk.namabrg || cellVal(ws, 'AQ', r),
-      cara: lk.caraPembelian || "-",
-      leasing: leasing,
-      salesman: resolveSalesman(cellVal(ws, 'AO', r)),
-      supervisor: lk.supervisor,
-      tglTagih: isoFromExcelDate(cellVal(ws, 'AR', r)),
-      tglBarcode: isoFromExcelDate(cellVal(ws, 'AS', r)),
-      followup: cellVal(ws, 'AY', r),
+      noCust: cellVal(ws, 'B', r),
+      nama: nama,
+      faktur: cellVal(ws, 'D', r),
+      top: cellVal(ws, 'E', r) || 0,
+      tglJto: isoFromExcelDate(cellVal(ws, 'F', r)),
+      jumlah: cellVal(ws, 'G', r) || 0,
+      type: cellVal(ws, 'I', r),
+      cara: cellVal(ws, 'K', r) || "-",
+      leasing: cellVal(ws, 'L', r) || "-",
+      salesman: salesman,
+      supervisor: cellVal(ws, 'N', r),
+      tglTagih: isoFromExcelDate(cellVal(ws, 'O', r)),
+      tglBarcode: isoFromExcelDate(cellVal(ws, 'P', r)),
+      followup: (followupRaw === "#N/A" ? null : followupRaw),
     });
   }
-  return out;
+  return { rows: out, reportDateLabel };
 }
 
-function applyNewData(list, syncedAt) {
+function applyNewData(list, reportDateLabel, syncedAt) {
   rows = list.map(r => ({...r, hari: computeHari(r.tglJto), cat: categorize(r)}));
   render();
   renderLeasingTab();
+  if (reportDateLabel) {
+    REPORT_DATE_LABEL = reportDateLabel;
+    document.getElementById('todayLabel').textContent = REPORT_DATE_LABEL;
+  }
   const t = syncedAt.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
   setSync('live', `Live dari Google Sheet &middot; diperbarui otomatis tiap 2 menit &middot; sinkron terakhir ${t}`);
 }
@@ -779,25 +782,51 @@ async function handleWatchEvent(ev) {
     const base64 = payload && payload.content;
     if (!base64) { setSync('stale', 'Format data tak dikenali, menampilkan data terakhir.'); return; }
     const wb = XLSX.read(base64, { type: 'base64', cellDates: true });
-    const list = extractGatsuFromWorkbook(wb);
-    applyNewData(list, new Date());
+    const { rows: list, reportDateLabel } = extractGatsuFromWorkbook(wb);
+    applyNewData(list, reportDateLabel, new Date());
   } catch (err) {
     console.error(err);
     setSync('stale', 'Gagal memproses data terbaru, menampilkan data terakhir.');
+  } finally {
+    setRefreshBtnSpinning(false);
   }
 }
+
+let mcpHandle = null;
+const refreshBtn = document.getElementById('refreshBtn');
+function setRefreshBtnSpinning(on) {
+  refreshBtn.disabled = on;
+  refreshBtn.classList.toggle('spinning', on);
+}
+refreshBtn.addEventListener('click', async () => {
+  if (!mcpHandle) return;
+  setRefreshBtnSpinning(true);
+  setSync('stale', 'Menyegarkan data&hellip;');
+  try {
+    await mcpHandle.invalidate('Google Drive', 'download_file_content', { fileId: FILE_ID, exportMimeType: XLSX_MIME });
+    // hasil baru akan datang lewat handler watchTool di atas; beri jeda agar tidak macet kalau tidak ada perubahan
+    setTimeout(() => setRefreshBtnSpinning(false), 4000);
+  } catch (e) {
+    console.error(e);
+    setSync('error', 'Gagal menyegarkan data secara manual.');
+    setRefreshBtnSpinning(false);
+  }
+});
 
 (async function initLiveSync() {
   if (typeof XLSX === 'undefined') {
     setSync('error', 'Pustaka pembaca Excel gagal dimuat. Menampilkan data statis.');
+    refreshBtn.disabled = true;
     return;
   }
   let mcp = null;
   try { mcp = await claude.use('mcp'); } catch (e) { mcp = null; }
   if (!mcp) {
     setSync('stale', 'Mode statis (dibuka di luar Claude, atau Google Drive belum tersedia di sini).');
+    refreshBtn.disabled = true;
     return;
   }
+  mcpHandle = mcp;
   setSync('stale', 'Menghubungkan ke Google Drive&hellip;');
   try {
     mcp.watchTool(
@@ -810,6 +839,7 @@ async function handleWatchEvent(ev) {
   } catch (e) {
     console.error(e);
     setSync('error', 'Tidak bisa memulai sinkronisasi otomatis. Menampilkan data statis.');
+    refreshBtn.disabled = true;
   }
 })();
 </script>
