@@ -56,6 +56,7 @@
       --cat-26-wash: #2E2911;
       --cat-over-wash: #2A1211;
       --cat-notdue-wash: #23262D;
+      --header-grad: linear-gradient(120deg, #1C1E27 0%, #1E2029 55%, #1A2230 100%);
     }
   }
   :root[data-theme="dark"] {
@@ -72,6 +73,7 @@
     --cat-26-wash: #2E2911;
     --cat-over-wash: #2A1211;
     --cat-notdue-wash: #23262D;
+    --header-grad: linear-gradient(120deg, #1C1E27 0%, #1E2029 55%, #1A2230 100%);
   }
   html { scroll-padding-top: env(safe-area-inset-top, 0px); }
   * { box-sizing: border-box; }
@@ -86,14 +88,53 @@
   }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 64px; }
 
-  /* ---- Header / hero ---- */
-  .brandline {
-    display: flex; align-items: baseline; justify-content: space-between;
-    flex-wrap: wrap; gap: 8px;
-    color: var(--muted); font-size: 13px; margin-bottom: 22px;
+  /* ---- Header banner ---- */
+  .header-banner {
+    background: var(--header-grad);
+    border-radius: var(--radius);
+    padding: 22px 24px 18px;
+    margin-bottom: 8px;
   }
-  .brandline strong { color: var(--ink); font-weight: 600; }
-  .tabs { display: flex; gap: 4px; margin: 18px 0 24px; border-bottom: 1px solid var(--border); }
+  .header-grid {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px 32px;
+  }
+  .header-left .eyebrow { margin: 0 0 6px; color: var(--muted); font-size: 13.5px; }
+  .header-left .page-title {
+    margin: 0; font-family: var(--serif); font-weight: 700;
+    font-size: clamp(26px, 4vw, 34px); color: var(--ink); letter-spacing: -0.01em;
+  }
+  .header-left .report-date { margin: 8px 0 0; color: var(--faint); font-size: 13px; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  .sync-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .sync-badge {
+    width: 22px; height: 22px; border-radius: 6px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #3D7DFF; color: #FFFFFF; transition: background .2s ease;
+  }
+  .sync-badge svg { width: 13px; height: 13px; }
+  .sync-row.stale .sync-badge { background: var(--cat-14); }
+  .sync-row.error .sync-badge { background: var(--cat-over); }
+  .sync-row.live .sync-badge svg { animation: none; }
+  .sync-text { color: var(--muted); font-size: 13.5px; white-space: normal; }
+  .sync-text strong { color: var(--ink); font-weight: 600; }
+  .refresh-btn {
+    appearance: none; border: 1px solid var(--border); background: var(--surface);
+    color: var(--ink); font-family: var(--sans); font-size: 13px; font-weight: 500;
+    padding: 6px 14px; border-radius: 8px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    box-shadow: 0 1px 2px rgba(16,24,40,0.04);
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .refresh-btn:hover { border-color: var(--faint); background: var(--surface-2); }
+  .refresh-btn:disabled { opacity: 0.6; cursor: default; }
+  .refresh-btn .refresh-icon { width: 15px; height: 15px; color: #3D7DFF; flex: none; transition: transform .5s ease; }
+  .refresh-btn.spinning .refresh-icon { animation: spin 0.8s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .source-line { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .header-divider { border: none; border-top: 1px solid var(--border); margin: 18px 0 24px; }
+
+  .tabs { display: flex; gap: 4px; margin: 0 0 24px; border-bottom: 1px solid var(--border); }
   .tab {
     appearance: none; border: none; background: transparent; cursor: pointer;
     padding: 9px 4px; margin-right: 20px; font-family: var(--sans); font-size: 14px;
@@ -149,28 +190,13 @@
   table.detail tbody tr:last-child td { border-bottom: none; }
   table.detail td.money, table.detail td.hari { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
   table.detail td.nama { font-weight: 500; }
-  .syncline {
-    display: flex; align-items: center; gap: 7px;
-    color: var(--faint); font-size: 12px; margin: -14px 0 22px;
+
+  @media (max-width: 640px) {
+    .header-grid { flex-direction: column; }
+    .header-right { align-items: flex-start; width: 100%; }
+    .sync-row { justify-content: flex-start; }
   }
-  .syncline .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
-  .syncline.live .dot { background: #2E9E5B; }
-  .syncline.stale .dot { background: var(--cat-14); }
-  .syncline.error .dot { background: var(--cat-over); }
-  .syncrow { display: flex; align-items: center; gap: 12px; margin: 0 0 22px; flex-wrap: wrap; }
-  .syncrow .syncline { margin: 0; }
-  .refresh-btn {
-    appearance: none; border: 1px solid var(--border); background: var(--surface);
-    color: var(--muted); font-family: var(--sans); font-size: 12px;
-    padding: 5px 10px; border-radius: 999px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 5px;
-    transition: border-color .15s ease, color .15s ease;
-  }
-  .refresh-btn:hover { border-color: var(--ink); color: var(--ink); }
-  .refresh-btn:disabled { opacity: 0.5; cursor: default; }
-  .refresh-icon { display: inline-block; transition: transform .5s ease; }
-  .refresh-btn.spinning .refresh-icon { animation: spin 0.8s linear infinite; }
-  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 
   .hero {
     display: grid;
@@ -298,16 +324,35 @@
 <body>
 <div class="wrap">
 
-  <div class="brandline">
-    <span><strong>PT. Perintis Perkasa</strong> &middot; Cabang Gatsu</span>
-    <span id="todayLabel"></span>
+  <div class="header-banner">
+    <div class="header-grid">
+      <div class="header-left">
+        <p class="eyebrow">PT Perintis Perkasa, Medan</p>
+        <h1 class="page-title">Piutang Gatsu</h1>
+        <p class="report-date" id="todayLabel"></p>
+      </div>
+      <div class="header-right">
+        <div class="sync-row" id="syncRow">
+          <span class="sync-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/>
+              <path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/>
+            </svg>
+          </span>
+          <span class="sync-text" id="syncText">Memuat status sinkronisasi&hellip;</span>
+          <button type="button" class="refresh-btn" id="refreshBtn" title="Segarkan sekarang">
+            <svg class="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 0 1 15.3-6.4L21 8"/><path d="M21 3v5h-5"/>
+              <path d="M21 12a9 9 0 0 1-15.3 6.4L3 16"/><path d="M3 21v-5h5"/>
+            </svg>
+            Refresh
+          </button>
+        </div>
+        <p class="source-line">Sumber: Laporan Piutang Per Nama (<span id="sourceCount">0</span> faktur)</p>
+      </div>
+    </div>
   </div>
-  <div class="syncrow">
-    <div class="syncline" id="syncline">Memuat status sinkronisasi&hellip;</div>
-    <button type="button" class="refresh-btn" id="refreshBtn" title="Segarkan sekarang">
-      <span class="refresh-icon">&#8635;</span> Segarkan
-    </button>
-  </div>
+  <hr class="header-divider">
 
   <div class="tabs" id="tabs">
     <button class="tab active" data-tab="umur">Umur Piutang</button>
@@ -442,8 +487,9 @@ function fmtMoney(n) { return Math.round(n).toLocaleString('id-ID'); }
 function fmtDateShort(s) {
   const d = parseDate(s);
   if (!d) return s || "\u2013";
-  const bulan = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
-  return d.getDate() + " " + bulan[d.getMonth()] + " " + d.getFullYear();
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
 document.getElementById('todayLabel').textContent = REPORT_DATE_LABEL;
@@ -679,16 +725,22 @@ document.querySelectorAll('.tab').forEach(btn => {
 
 render();
 renderLeasingTab();
+document.getElementById('sourceCount').textContent = rows.length;
 
 /* ================= Live sync dari Google Sheet (tiap 2 menit) ================= */
 const FILE_ID = "1ul2WqwEb4X66Q6CYdycNvtyaLu08axFkZL75FI-qdmM";
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const KNOWN_DIVISI = ["Gatsu", "Flamboyan", "Gagak Hitam"];
-const syncEl = document.getElementById('syncline');
+const syncRowEl = document.getElementById('syncRow');
+const syncTextEl = document.getElementById('syncText');
+let lastSyncedLabel = null; // tanggal-jam refresh terakhir yang BERHASIL, tetap tampil walau status berubah
 
-function setSync(state, text) {
-  syncEl.className = 'syncline ' + state;
-  syncEl.innerHTML = '<span class="dot"></span>' + text;
+function setSync(state, message) {
+  syncRowEl.className = 'sync-row ' + state;
+  const suffix = lastSyncedLabel
+    ? ` &middot; Terakhir refresh: <strong>${lastSyncedLabel}</strong>`
+    : '';
+  syncTextEl.innerHTML = message + suffix;
 }
 
 function isoFromExcelDate(v) {
@@ -760,12 +812,16 @@ function applyNewData(list, reportDateLabel, syncedAt) {
   rows = list.map(r => ({...r, hari: computeHari(r.tglJto), cat: categorize(r)}));
   render();
   renderLeasingTab();
+  document.getElementById('sourceCount').textContent = rows.length;
   if (reportDateLabel) {
     REPORT_DATE_LABEL = reportDateLabel;
     document.getElementById('todayLabel').textContent = REPORT_DATE_LABEL;
   }
-  const t = syncedAt.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
-  setSync('live', `Live dari Google Sheet &middot; diperbarui otomatis tiap 2 menit &middot; sinkron terakhir ${t}`);
+  const bulanFull = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+  const jam = String(syncedAt.getHours()).padStart(2,'0');
+  const menit = String(syncedAt.getMinutes()).padStart(2,'0');
+  lastSyncedLabel = `${syncedAt.getDate()} ${bulanFull[syncedAt.getMonth()]} ${syncedAt.getFullYear()}, ${jam}:${menit}`;
+  setSync('live', `Live &middot; otomatis tiap 2 menit`);
 }
 
 async function handleWatchEvent(ev) {
