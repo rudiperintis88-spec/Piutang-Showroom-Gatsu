@@ -730,6 +730,7 @@ document.getElementById('sourceCount').textContent = rows.length;
 /* ================= Live sync dari Google Sheet (tiap 2 menit) ================= */
 const FILE_ID = "1ul2WqwEb4X66Q6CYdycNvtyaLu08axFkZL75FI-qdmM";
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const TARGET_DIVISI = "Gatsu";
 const KNOWN_DIVISI = ["Gatsu", "Flamboyan", "Gagak Hitam"];
 const syncRowEl = document.getElementById('syncRow');
 const syncTextEl = document.getElementById('syncText');
@@ -780,7 +781,7 @@ function extractGatsuFromWorkbook(wb) {
     const nama = cellVal(ws, 'C', r);
     if (nama == null || nama === "") continue; // lewati baris kosong/sisa template & baris "Total:"
     const divisi = cellVal(ws, 'J', r);
-    if (divisi !== "Gatsu") continue; // dashboard ini khusus Gatsu
+    if (divisi !== TARGET_DIVISI) continue; // dashboard ini khusus divisi ini
 
     let salesman = cellVal(ws, 'M', r);
     if (typeof salesman === 'string' && salesman.includes('=')) {
@@ -849,39 +850,36 @@ async function handleWatchEvent(ev) {
 }
 
 let mcpHandle = null;
+let gvizPollTimer = null;
 const refreshBtn = document.getElementById('refreshBtn');
 function setRefreshBtnSpinning(on) {
   refreshBtn.disabled = on;
   refreshBtn.classList.toggle('spinning', on);
 }
 refreshBtn.addEventListener('click', async () => {
-  if (!mcpHandle) return;
-  setRefreshBtnSpinning(true);
-  setSync('stale', 'Menyegarkan data&hellip;');
-  try {
-    await mcpHandle.invalidate('Google Drive', 'download_file_content', { fileId: FILE_ID, exportMimeType: XLSX_MIME });
-    // hasil baru akan datang lewat handler watchTool di atas; beri jeda agar tidak macet kalau tidak ada perubahan
-    setTimeout(() => setRefreshBtnSpinning(false), 4000);
-  } catch (e) {
-    console.error(e);
-    setSync('error', 'Gagal menyegarkan data secara manual.');
-    setRefreshBtnSpinning(false);
+  if (mcpHandle) {
+    setRefreshBtnSpinning(true);
+    setSync('stale', 'Menyegarkan data&hellip;');
+    try {
+      await mcpHandle.invalidate('Google Drive', 'download_file_content', { fileId: FILE_ID, exportMimeType: XLSX_MIME });
+      setTimeout(() => setRefreshBtnSpinning(false), 4000);
+    } catch (e) {
+      console.error(e);
+      setSync('error', 'Gagal menyegarkan data secara manual.');
+      setRefreshBtnSpinning(false);
+    }
+  } else if (window.__gvizFetchNow) {
+    setRefreshBtnSpinning(true);
+    window.__gvizFetchNow();
   }
 });
 
-(async function initLiveSync() {
-  if (typeof XLSX === 'undefined') {
-    setSync('error', 'Pustaka pembaca Excel gagal dimuat. Menampilkan data statis.');
-    refreshBtn.disabled = true;
-    return;
-  }
+/* ---------- Jalur A: dalam Claude (artifact viewer), via Google Drive mcp capability ---------- */
+async function tryMcpSync() {
+  if (typeof XLSX === 'undefined') return false;
   let mcp = null;
   try { mcp = await claude.use('mcp'); } catch (e) { mcp = null; }
-  if (!mcp) {
-    setSync('stale', 'Mode statis (dibuka di luar Claude, atau Google Drive belum tersedia di sini).');
-    refreshBtn.disabled = true;
-    return;
-  }
+  if (!mcp) return false;
   mcpHandle = mcp;
   setSync('stale', 'Menghubungkan ke Google Drive&hellip;');
   try {
@@ -892,11 +890,109 @@ refreshBtn.addEventListener('click', async () => {
       (ev) => { handleWatchEvent(ev); },
       { refetchInterval: 120000 }
     );
+    return true;
   } catch (e) {
     console.error(e);
-    setSync('error', 'Tidak bisa memulai sinkronisasi otomatis. Menampilkan data statis.');
-    refreshBtn.disabled = true;
+    return false;
   }
+}
+
+/* ---------- Jalur B: di luar Claude (mis. situs yang di-deploy ke Vercel), via endpoint publik Google Sheets ---------- */
+function gvizCell(rows, r, c) {
+  const row = rows[r];
+  if (!row || !row.c) return null;
+  const cell = row.c[c];
+  return cell ? cell.v : null;
+}
+function gvizDateToIso(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === 'string' && v.startsWith('Date(')) {
+    const parts = v.slice(5, -1).split(',').map(Number);
+    const [y, m, d] = parts;
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+  return v; // sudah teks biasa (mis. "Belum Buat Tagihan")
+}
+function extractFromGvizTable(table) {
+  const trows = table.rows;
+  let reportDateLabel = REPORT_DATE_LABEL;
+  const a4 = gvizCell(trows, 3, 0);
+  if (typeof a4 === 'string' && a4.trim() !== "") reportDateLabel = a4.trim();
+
+  const out = [];
+  for (let r = 9; r < trows.length; r++) {
+    const nama = gvizCell(trows, r, 2); // C
+    if (nama == null || nama === "") continue;
+    const divisi = gvizCell(trows, r, 9); // J
+    if (divisi !== TARGET_DIVISI) continue;
+
+    let salesman = gvizCell(trows, r, 12); // M
+    if (typeof salesman === 'string' && salesman.includes('=')) {
+      salesman = salesman.slice(salesman.indexOf('=') + 1).trim();
+    }
+    const followupRaw = gvizCell(trows, r, 16); // Q
+
+    out.push({
+      noCust: gvizCell(trows, r, 1),
+      nama: nama,
+      faktur: gvizCell(trows, r, 3),
+      top: gvizCell(trows, r, 4) || 0,
+      tglJto: gvizDateToIso(gvizCell(trows, r, 5)),
+      jumlah: gvizCell(trows, r, 6) || 0,
+      type: gvizCell(trows, r, 8),
+      cara: gvizCell(trows, r, 10) || "-",
+      leasing: gvizCell(trows, r, 11) || "-",
+      salesman: salesman,
+      supervisor: gvizCell(trows, r, 13),
+      tglTagih: gvizDateToIso(gvizCell(trows, r, 14)),
+      tglBarcode: gvizDateToIso(gvizCell(trows, r, 15)),
+      followup: (followupRaw === "#N/A" ? null : followupRaw),
+    });
+  }
+  return { rows: out, reportDateLabel };
+}
+
+function startGvizFallback() {
+  refreshBtn.disabled = false;
+  function fetchOnce() {
+    setSync('stale', 'Menghubungkan ke Google Sheets&hellip;');
+    const cbName = '__gvizCb_' + Date.now();
+    let settled = false;
+    const script = document.createElement('script');
+    const cleanup = () => {
+      delete window[cbName];
+      script.remove();
+      setRefreshBtnSpinning(false);
+    };
+    window[cbName] = function (resp) {
+      settled = true;
+      try {
+        const { rows: list, reportDateLabel } = extractFromGvizTable(resp.table);
+        applyNewData(list, reportDateLabel, new Date());
+      } catch (err) {
+        console.error(err);
+        setSync('stale', 'Gagal memproses data dari Google Sheets.');
+      } finally {
+        cleanup();
+      }
+    };
+    script.src = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=Sheet1`;
+    script.onerror = function () {
+      setSync('error', 'Tidak bisa memuat data dari Google Sheets. Pastikan sheet dibagikan sebagai "Siapa saja yang memiliki link" (Anyone with the link).');
+      cleanup();
+    };
+    setTimeout(() => { if (!settled) { setSync('error', 'Waktu tunggu Google Sheets habis. Coba segarkan lagi.'); cleanup(); } }, 15000);
+    document.body.appendChild(script);
+  }
+  window.__gvizFetchNow = fetchOnce;
+  fetchOnce();
+  gvizPollTimer = setInterval(fetchOnce, 120000);
+}
+
+(async function initLiveSync() {
+  const okMcp = await tryMcpSync();
+  if (okMcp) return;
+  startGvizFallback();
 })();
 </script>
 </body>
