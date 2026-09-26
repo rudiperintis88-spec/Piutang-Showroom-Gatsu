@@ -915,14 +915,31 @@ function gvizDateToIso(v) {
 }
 function extractFromGvizTable(table) {
   const trows = table.rows;
+
+  // Cari baris "Per : ..." di kolom A secara isi, bukan asumsi posisi baris.
   let reportDateLabel = REPORT_DATE_LABEL;
-  const a4 = gvizCell(trows, 3, 0);
-  if (typeof a4 === 'string' && a4.trim() !== "") reportDateLabel = a4.trim();
+  for (let r = 0; r < Math.min(trows.length, 20); r++) {
+    const v = gvizCell(trows, r, 0);
+    if (typeof v === 'string' && v.trim().toLowerCase().startsWith('per')) {
+      reportDateLabel = v.trim();
+      break;
+    }
+  }
+
+  // Cari baris header asli ("Nama Debitur" di kolom C) alih-alih menebak nomor barisnya —
+  // supaya tidak bergantung pada bagaimana Google menyusun ulang baris saat dikirim ke browser.
+  let headerRowIdx = -1;
+  for (let r = 0; r < Math.min(trows.length, 30); r++) {
+    const v = gvizCell(trows, r, 2);
+    if (typeof v === 'string' && v.trim().toLowerCase() === 'nama debitur') { headerRowIdx = r; break; }
+  }
+  const startRow = headerRowIdx >= 0 ? headerRowIdx + 1 : 9; // 9 = fallback lama kalau header tak ketemu
 
   const out = [];
-  for (let r = 9; r < trows.length; r++) {
+  for (let r = startRow; r < trows.length; r++) {
     const nama = gvizCell(trows, r, 2); // C
-    if (nama == null || nama === "") continue;
+    if (nama == null || nama === "" || nama === "Nama Debitur") continue;
+    if (typeof nama === 'string' && nama.trim().toLowerCase() === 'total:') continue;
     const divisi = gvizCell(trows, r, 9); // J
     if (divisi !== TARGET_DIVISI) continue;
 
@@ -968,7 +985,11 @@ function startGvizFallback() {
       settled = true;
       try {
         const { rows: list, reportDateLabel } = extractFromGvizTable(resp.table);
-        applyNewData(list, reportDateLabel, new Date());
+        if (list.length === 0 && rows.length > 0) {
+          setSync('stale', 'Data dari Google Sheets kosong/tidak cocok, menampilkan data terakhir yang valid.');
+        } else {
+          applyNewData(list, reportDateLabel, new Date());
+        }
       } catch (err) {
         console.error(err);
         setSync('stale', 'Gagal memproses data dari Google Sheets.');
