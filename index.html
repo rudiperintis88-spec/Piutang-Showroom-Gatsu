@@ -727,7 +727,7 @@ render();
 renderLeasingTab();
 document.getElementById('sourceCount').textContent = rows.length;
 
-/* ================= Live sync dari Google Sheet (tiap 2 menit) ================= */
+/* ================= Live sync dari Google Sheet (tiap 30 detik) ================= */
 const FILE_ID = "1ul2WqwEb4X66Q6CYdycNvtyaLu08axFkZL75FI-qdmM";
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const TARGET_DIVISI = "Gatsu";
@@ -766,10 +766,16 @@ function extractGatsuFromWorkbook(wb) {
   if (!ws || !ws['!ref']) throw new Error("Sheet 'Sheet1' tidak ditemukan");
   const range = XLSX.utils.decode_range(ws['!ref']);
 
-  // Baris 4 (index 3) berisi label "Per : DD-Mmm-YYYY" persis seperti yang tertulis di spreadsheet.
+  // Cari baris "Per : ..." di kolom A berdasarkan ISINYA (bukan asumsi posisi baris ke-4),
+  // supaya tetap benar walau ada baris disisipkan/dihapus di atasnya.
   let reportDateLabel = REPORT_DATE_LABEL;
-  const a4 = cellVal(ws, 'A', 3);
-  if (typeof a4 === 'string' && a4.trim() !== "") reportDateLabel = a4.trim();
+  for (let r = 0; r < 20; r++) {
+    const v = cellVal(ws, 'A', r);
+    if (typeof v === 'string' && v.trim().toLowerCase().startsWith('per')) {
+      reportDateLabel = v.trim();
+      break;
+    }
+  }
 
   // Sheet1 adalah laporan final: sudah mengecualikan faktur yang lunas dan sudah
   // menghitung Divisi/Leasing/Salesman dengan benar. Kolom: A=No, B=No.Cust,
@@ -822,7 +828,7 @@ function applyNewData(list, reportDateLabel, syncedAt) {
   const jam = String(syncedAt.getHours()).padStart(2,'0');
   const menit = String(syncedAt.getMinutes()).padStart(2,'0');
   lastSyncedLabel = `${syncedAt.getDate()} ${bulanFull[syncedAt.getMonth()]} ${syncedAt.getFullYear()}, ${jam}:${menit}`;
-  setSync('live', `Live &middot; otomatis tiap 2 menit`);
+  setSync('live', `Live &middot; otomatis tiap 30 detik`);
 }
 
 async function handleWatchEvent(ev) {
@@ -888,7 +894,7 @@ async function tryMcpSync() {
       'download_file_content',
       { fileId: FILE_ID, exportMimeType: XLSX_MIME },
       (ev) => { handleWatchEvent(ev); },
-      { refetchInterval: 120000 }
+      { refetchInterval: 30000 }
     );
     return true;
   } catch (e) {
@@ -1007,7 +1013,7 @@ function startGvizFallback() {
   }
   window.__gvizFetchNow = fetchOnce;
   fetchOnce();
-  gvizPollTimer = setInterval(fetchOnce, 120000);
+  gvizPollTimer = setInterval(fetchOnce, 30000);
 }
 
 (async function initLiveSync() {
