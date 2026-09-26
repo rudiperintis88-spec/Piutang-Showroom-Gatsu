@@ -976,7 +976,7 @@ function startGvizFallback() {
         cleanup();
       }
     };
-    script.src = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=Sheet1`;
+    script.src = `https://docs.google.com/spreadsheets/d/${FILE_ID}/gviz/tq?tqx=out:json;responseHandler:${cbName}&sheet=Sheet1&range=A1:Q500&headers=0`;
     script.onerror = function () {
       setSync('error', 'Tidak bisa memuat data dari Google Sheets. Pastikan sheet dibagikan sebagai "Siapa saja yang memiliki link" (Anyone with the link).');
       cleanup();
