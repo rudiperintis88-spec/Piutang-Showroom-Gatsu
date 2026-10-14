@@ -491,6 +491,11 @@
   .pr-wrap table.detail thead th .sa{font-size:9px;margin-left:4px;opacity:.55}
   .pr-wrap table.detail thead th .sa.on{opacity:1}
 
+  /* tabel Umur Piutang: tulisan satu baris (tidak terpecah), ukuran huruf menyesuaikan lebar layar -- sama untuk Gatsu, Flamboyan, Gagak Hitam */
+  div.table-scroll{overflow-x:auto !important}
+  div.table-scroll &gt; table:not(#followupTable){width:100% !important;min-width:0 !important}
+  div.table-scroll &gt; table:not(#followupTable) thead th{white-space:nowrap !important;overflow-wrap:normal !important;word-break:keep-all !important;font-size:clamp(10px,.78vw,12px) !important;padding:9px 8px !important}
+  div.table-scroll &gt; table:not(#followupTable) tbody td{white-space:nowrap !important;overflow-wrap:normal !important;word-break:keep-all !important;font-size:clamp(10px,.82vw,12.5px) !important;padding:10px 8px !important}
   /* Prioritas Penagihan &amp; tabel rincian: semua tulisan satu baris, ukuran huruf menyesuaikan lebar layar (tidak terpotong / turun baris) */
   .table-scroll,.leasing-table-scroll,.pr-wrap .table-scroll{overflow-x:auto !important}
   .pr-wrap table.detail{width:100% !important;min-width:0 !important}
