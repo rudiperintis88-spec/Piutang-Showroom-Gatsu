@@ -1730,6 +1730,10 @@ function extractGatsuFromWorkbook(wb) {
       followup: (followupRaw === &quot;#N/A&quot; ? null : followupRaw),
     });
   }
+  try {
+    const nm = PERFAKTUR_SHEETS.find(n =&gt; wb.Sheets[n]);
+    applyPerfaktur(out, nm ? buildPerfaktur(XLSX.utils.sheet_to_json(wb.Sheets[nm], { header: 1, raw: false, defval: &quot;&quot;, dateNF: &quot;dd/mm/yyyy&quot; })) : null);
+  } catch (e) { perfakturState = &#x27;fail&#x27;; }
   return { rows: out, reportDateLabel };
 }
 
@@ -1750,7 +1754,7 @@ function applyNewData(list, reportDateLabel, syncedAt) {
   const jam = String(syncedAt.getHours()).padStart(2,&#x27;0&#x27;);
   const menit = String(syncedAt.getMinutes()).padStart(2,&#x27;0&#x27;);
   lastSyncedLabel = `${syncedAt.getDate()} ${bulanFull[syncedAt.getMonth()]} ${syncedAt.getFullYear()}, ${jam}:${menit}`;
-  setSync(&#x27;live&#x27;, `Live &amp;middot; tersinkron &lt;strong&gt;${lastSyncedLabel}&lt;/strong&gt; &amp;middot; otomatis tiap 2 menit`);
+  setSync(&#x27;live&#x27;, `Live &amp;middot; tersinkron &lt;strong&gt;${lastSyncedLabel}&lt;/strong&gt; &amp;middot; otomatis tiap 2 menit` + pfNote());
 }
 
 /* ---------- Sinkronisasi live: CSV &quot;Publish to web&quot; (cara baca sama dengan dashboard gabungan) ---------- */
@@ -1844,6 +1848,73 @@ function parseSalesCsv(csv) {
   return mapSales(h + 1, csv.length, get);
 }
 
+/* ===== Data Perfaktur: Tgl Buat Tagihan &amp; Tgl Barcode dibaca otomatis dari sheet &quot;Data Perfaktur&quot; (dicocokkan lewat No. Faktur) =====
+   Kolom dicari lewat JUDUL (&quot;No. Faktur&quot;, &quot;Tgl Buat Tagihan&quot;, &quot;Tgl Barcode&quot;), urutan kolom bebas. Kolom O &amp; P di sheet piutang hanya cadangan
+   bila sheet Data Perfaktur tidak terbaca. Faktur yang tidak ada di Data Perfaktur / tanggalnya kosong = &quot;Belum Buat Tagihan&quot;. */
+const PERFAKTUR_FILE_ID = &#x27;1qPXn1eOM3J5ygKKSa7Ld5qmf4GCSsyS60CojPguaZ_c&#x27;;
+const PERFAKTUR_SHEETS = [&#x27;Data Perfaktur&#x27;, &#x27;Data Per Faktur&#x27;, &#x27;Data PerFaktur&#x27;, &#x27;Data per faktur&#x27;, &#x27;Data Per-Faktur&#x27;, &#x27;DataPerfaktur&#x27;];   // nama sheet dicoba berurutan
+const perfakturUrl = name =&gt; &#x27;https://docs.google.com/spreadsheets/d/&#x27; + PERFAKTUR_FILE_ID + &#x27;/gviz/tq?tqx=out:csv&amp;headers=0&amp;sheet=&#x27; + encodeURIComponent(name);
+let perfakturState = &#x27;off&#x27;;   // ok | fail (sheet tidak terbaca) | nomatch (tidak ada faktur yang cocok)
+const pfKey = v =&gt; String(v == null ? &#x27;&#x27; : v).replace(/[^A-Za-z0-9]/g, &#x27;&#x27;).toUpperCase();
+const pfHdr = v =&gt; String(v == null ? &#x27;&#x27; : v).replace(/\s+/g, &#x27; &#x27;).trim().toLowerCase();
+const pfClean = v =&gt; { const s = String(v == null ? &#x27;&#x27; : v).trim(); return (!s || s === &#x27;-&#x27; || s.charAt(0) === &#x27;#&#x27;) ? &#x27;&#x27; : s; };
+function buildPerfaktur(rows) {
+  if (!rows || !rows.length) return null;
+  for (let i = 0; i &lt; rows.length &amp;&amp; i &lt; 15; i++) {
+    const h = (rows[i] || []).map(pfHdr);
+    const find = (...res) =&gt; { for (const re of res) { const j = h.findIndex(t =&gt; re.test(t)); if (j &gt; -1) return j; } return -1; };
+    const iF = find(/^(no\.?\s*)?faktur$/, /^no\.?\s*fak/, /faktur/);
+    if (iF &lt; 0) continue;
+    const iT = find(/^(tgl|tanggal)\.?\s*buat\s*tagihan$/, /buat\s*tagihan/, /(tgl|tanggal)\.?\s*.*tagihan/, /tagihan/);
+    const iB = find(/^(tgl|tanggal)\.?\s*barcode$/, /(tgl|tanggal)\.?\s*.*barcode/, /barcode/);
+    if (iT &lt; 0 &amp;&amp; iB &lt; 0) continue;
+    const map = {};
+    for (let k = i + 1; k &lt; rows.length; k++) {
+      const r = rows[k]; if (!r) continue;
+      const key = pfKey(r[iF]); if (!key) continue;
+      const buat = iT &gt; -1 ? pfClean(r[iT]) : &#x27;&#x27;, barcode = iB &gt; -1 ? pfClean(r[iB]) : &#x27;&#x27;;
+      const old = map[key];
+      if (!old) map[key] = { buat, barcode };
+      else { if (!old.buat &amp;&amp; buat) old.buat = buat; if (!old.barcode &amp;&amp; barcode) old.barcode = barcode; }   // faktur ganda: isi yang tersedia
+    }
+    return map;
+  }
+  return null;
+}
+async function fetchPerfaktur() {
+  for (const name of PERFAKTUR_SHEETS) {
+    try {
+      const res = await fetch(perfakturUrl(name), { cache: &#x27;no-store&#x27; });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (/^\s*&lt;/.test(text)) continue;
+      const map = buildPerfaktur(parseCSVFull(text.replace(/^\uFEFF/, &#x27;&#x27;)));
+      if (map) return map;
+    } catch (e) { console.warn(&#x27;Data Perfaktur tidak terbaca (&#x27; + name + &#x27;)&#x27;, e); }
+  }
+  return null;
+}
+function applyPerfaktur(list, map) {
+  if (!map) { perfakturState = &#x27;fail&#x27;; return; }
+  let hit = 0;
+  list.forEach(r =&gt; { if (map[pfKey(r.faktur)]) hit++; });
+  if (!hit) { perfakturState = &#x27;nomatch&#x27;; return; }   // tidak ada yang cocok -&gt; kemungkinan format No. Faktur beda; pakai kolom lama
+  const vals = [];
+  Object.keys(map).forEach(k =&gt; { vals.push(map[k].buat, map[k].barcode); });
+  const fmt = detectDateFormat(vals);
+  const conv = v =&gt; v ? (csvIso(v, fmt) || v) : null;
+  list.forEach(r =&gt; {
+    const p = map[pfKey(r.faktur)];
+    const b = p &amp;&amp; p.buat ? conv(p.buat) : null;
+    r.tglTagih = (b &amp;&amp; !/^belum/i.test(b)) ? b : &#x27;Belum Buat Tagihan&#x27;;
+    r.tglBarcode = p &amp;&amp; p.barcode ? conv(p.barcode) : null;
+  });
+  perfakturState = &#x27;ok&#x27;;
+}
+function pfNote() {
+  return perfakturState === &#x27;ok&#x27; || perfakturState === &#x27;off&#x27; ? &#x27;&#x27; : &#x27; &amp;middot; &lt;span style=&quot;color:#B42318&quot;&gt;&amp;#9888; Sheet &quot;Data Perfaktur&quot; &#x27; + (perfakturState === &#x27;nomatch&#x27; ? &#x27;tidak cocok dengan No. Faktur&#x27; : &#x27;tidak terbaca&#x27;) + &#x27; &amp;mdash; Tgl Buat Tagihan &amp;amp; Tgl Barcode memakai kolom sheet piutang&lt;/span&gt;&#x27;;
+}
+
 const refreshBtn = document.getElementById(&#x27;refreshBtn&#x27;);
 function setRefreshBtnSpinning(on) {
   refreshBtn.disabled = on;
@@ -1868,6 +1939,7 @@ async function syncNow(isManual) {
   if (isManual || !lastSyncedLabel) setSync(&#x27;stale&#x27;, &#x27;Menghubungkan ke Google Sheets&amp;hellip;&#x27;);
   try {
     const { rows: list, reportDateLabel, totalAll } = parsePiutangCsv(await fetchCsv(PIUTANG_CSV_URL));
+    if (list.length) applyPerfaktur(list, await fetchPerfaktur());
     if (list.length || totalAll &gt; 0) applyNewData(list, reportDateLabel, new Date());   // 0 faktur divisi ini = lunas semua (sheet tetap berisi divisi lain)
     else setSync(&#x27;stale&#x27;, &#x27;Sheet piutang terbaca kosong — menampilkan data terakhir.&#x27;);
   } catch (err) {
@@ -2106,7 +2178,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     &lt;/table&gt;
     &lt;div class=&quot;empty&quot; id=&quot;supEmpty&quot; hidden&gt;&lt;/div&gt;
   &lt;/div&gt;
-  &lt;p class=&quot;foot&quot;&gt;Umur (hari) dihitung otomatis dari Terima Tanggal BPKB sampai hari ini (tanggal perangkat), sehingga selalu bertambah setiap hari tanpa menunggu sheet diperbarui. Kategori: &amp;lt; 60 hari, 60&amp;ndash;90 hari (&amp;gt; 60), dan &amp;gt; 90 hari. Bila Terima Tanggal tidak terbaca, dipakai angka dari kolom Hari di sheet. Klik kartu ringkasan untuk menampilkan daftar unitnya. Tab Detail Per Supervisor menampilkan unit milik satu supervisor. Data diperbarui otomatis tiap 2 menit.&lt;/p&gt;
+  &lt;p class=&quot;foot&quot;&gt;Umur (hari) dihitung otomatis: tanggal hari ini dikurangi Terima Tanggal BPKB (dibulatkan). Kategori &amp;lt; 60, &amp;gt; 60, dan &amp;gt; 90 hari mengikuti umur tersebut. Salesman, Supervisor, dan Divisi dibaca otomatis dari sheet Data berdasarkan No. BAST. Klik kartu ringkasan untuk menampilkan daftar unitnya. Tab Detail Per Supervisor menampilkan unit milik satu supervisor. Data diperbarui otomatis tiap 2 menit.&lt;/p&gt;
 &lt;/main&gt;
 &lt;div class=&quot;toast&quot; id=&quot;toast&quot; role=&quot;status&quot;&gt;&lt;/div&gt;
 
@@ -2201,43 +2273,101 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     return num(v);
   }
 
-  // Umur otomatis: selisih hari kalender antara hari ini (jam perangkat) dan Terima Tanggal BPKB (kolom K).
-  // Bila tanggal tidak terbaca / di masa depan, dipakai angka dari kolom Hari di sheet.
-  function autoDays(v) {
-    var m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(normDate(v));
-    if (!m) return null;
-    var t = new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10));
-    var n = new Date(); n = new Date(n.getFullYear(), n.getMonth(), n.getDate());
-    var d = Math.round((n - t) / 86400000);
-    return isNaN(d) || d &lt; 0 ? null : d;
+  // Kolom sheet cabang yang dibaca (posisi lama, dipakai bila judul kolom tidak ditemukan):
+  // B=1 Customer, C=2 STNK a/n, D=3 NoRangka, G=6 No Polisi, I=8 Serah STNK, J=9 Nomor BPKB,
+  // K=10 Terima Tanggal (BPKB), O=14 Leasing, S=18 No. Bast, X=23 Serah Tanggal (BPKB).
+  // Salesman, Supervisor, Divisi dibaca otomatis dari sheet &quot;Data&quot; (dicocokkan lewat No. Bast).
+  // Umur (hari) dihitung otomatis: hari ini dikurangi Terima Tanggal BPKB; kolom Hari / Today / &lt;60Hr / &gt;60Hr / &gt;90Hr tidak dipakai lagi.
+
+  function normKey(v) { return String(v == null ? &quot;&quot; : v).replace(/\s+/g, &quot;&quot;).toUpperCase(); }
+  function hdrTxt(v) { return String(v == null ? &quot;&quot; : v).replace(/\[merged\]/ig, &quot;&quot;).replace(/\s+/g, &quot; &quot;).trim().toLowerCase(); }
+
+  // Letak kolom dicari dari judul kolom, jadi kolom lain boleh dihapus tanpa menggeser pembacaan
+  function mapCols(table) {
+    var M = { bast: 18, leasing: 14, serah: 23, salesF: -1, supF: -1, divF: -1 }, h = -1, i, j, a, b, n;
+    for (i = 0; i &lt; table.length &amp;&amp; i &lt; 15; i++) {
+      var r0 = table[i] || [];
+      if (r0.length &gt; 5 &amp;&amp; /^no$/.test(hdrTxt(r0[0]))) { h = i; break; }
+    }
+    if (h &lt; 0) return M;
+    a = table[h] || []; b = table[h + 1] || [];
+    n = Math.max(a.length, b.length);
+    var okBast = false, okLeas = false;
+    for (j = 0; j &lt; n; j++) {
+      var t1 = hdrTxt(a[j]), t2 = hdrTxt(b[j]);
+      if (!okBast &amp;&amp; (/^no\.?\s*bast/.test(t1) || /^no\.?\s*bast/.test(t2))) { M.bast = j; okBast = true; }
+      if (!okLeas &amp;&amp; (/^leasing/.test(t1) || /^leasing/.test(t2))) { M.leasing = j; okLeas = true; }
+      if (/^serah\s*ta/.test(t1) || /^serah\s*ta/.test(t2)) M.serah = j;      // yang paling kanan = Serah Tanggal BPKB
+      if (/^salesman/.test(t1) || /^salesman/.test(t2)) M.salesF = j;         // yang paling kanan = KODE=NAMA
+      if (/^supervisor/.test(t1) || /^supervisor/.test(t2)) M.supF = j;
+      if (/^divisi/.test(t1) || /^divisi/.test(t2)) M.divF = j;
+    }
+    return M;
   }
 
-  // Kolom sheet cabang: B=1 Customer, C=2 STNK a/n, D=3 NoRangka, G=6 No Polisi, I=8 Serah STNK,
-  // J=9 Nomor BPKB, K=10 Terima Tanggal (BPKB), L=11 &lt;60Hr, M=12 &gt;60Hr, N=13 &gt;90Hr, O=14 Leasing,
-  // U=20 Salesman, V=21 Supervisor, X=23 Serah Tanggal, Y=24 Hari
-  // raw = isi sheet yang sama dalam bentuk angka asli (opsional), dipakai untuk membaca kolom Hari
-  function extract(table, raw, ambilFn) {
-    var res = [];
+  // Sheet &quot;Data&quot;: kolom BAST | Salesman | Supervisor | Divisi -&gt; peta per nomor BAST
+  function buildLookup(rows) {
+    var map = {}, h = -1, ci = { s: 1, v: 2, d: 3, b: 0 }, i, j;
+    for (i = 0; i &lt; rows.length &amp;&amp; i &lt; 10; i++) {
+      var r = rows[i] || [];
+      for (j = 0; j &lt; r.length; j++) { if (/^bast$/.test(hdrTxt(r[j]))) { h = i; break; } }
+      if (h &gt;= 0) {
+        ci.b = j;
+        for (j = 0; j &lt; r.length; j++) {
+          var t = hdrTxt(r[j]);
+          if (/^salesman/.test(t)) ci.s = j; else if (/^supervisor/.test(t)) ci.v = j; else if (/^divisi/.test(t)) ci.d = j;
+        }
+        break;
+      }
+    }
+    for (i = h + 1; i &lt; rows.length; i++) {
+      var q = rows[i]; if (!q) continue;
+      var k = normKey(q[ci.b]);
+      if (!k || map[k]) continue;                       // BAST ganda: yang pertama dipakai
+      map[k] = { sales: cleanName(q[ci.s]), sup: String(q[ci.v] == null ? &quot;&quot; : q[ci.v]).trim(), div: String(q[ci.d] == null ? &quot;&quot; : q[ci.d]).trim() };
+    }
+    return map;
+  }
+
+  // Waktu (ms) dari sel tanggal: angka serial Excel, &quot;dd/mm/yyyy[ jam:menit[:detik]]&quot; atau &quot;yyyy-mm-dd&quot;
+  function stampMs(v) {
+    if (typeof v === &quot;number&quot;) {
+      if (!isFinite(v) || !window.XLSX || !XLSX.SSF || !XLSX.SSF.parse_date_code) return null;
+      var q = XLSX.SSF.parse_date_code(v);
+      return q ? new Date(q.y, q.m - 1, q.d, q.H || 0, q.M || 0, Math.floor(q.S || 0)).getTime() : null;
+    }
+    v = String(v == null ? &quot;&quot; : v).trim();
+    if (!v) return null;
+    var m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(v);
+    if (m) { if (+m[2] &gt; 12 || +m[1] &gt; 31) return null; return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime(); }
+    m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(v);
+    return m ? new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : null;
+  }
+  function todayStartMs() { var t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime(); }
+
+  // raw = isi sheet yang sama dalam bentuk angka asli (opsional); lookup = peta dari sheet &quot;Data&quot; (opsional)
+  function extract(table, raw, ambilFn, lookup) {
+    var res = [], M = mapCols(table), t0 = todayStartMs();
     table.forEach(function (c, ix) {
-      if (!c || c.length &lt; 15) return;
+      if (!c || c.length &lt;= M.leasing) return;
       if (!/^\s*\d+\s*$/.test(String(c[0]))) return;
-      if (String(c[14]).trim().toLowerCase() !== &quot;cash&quot;) return;
-      var rr = raw &amp;&amp; raw[ix], hv = hariVal(rr &amp;&amp; rr[24] !== undefined &amp;&amp; rr[24] !== &quot;&quot; ? rr[24] : c[24]);
-      var b = &quot;&quot;, n;
-      // kategori mengikuti kolom &lt;60Hr / &gt;60Hr / &gt;90Hr di sheet
-      if (num(c[13]) != null) b = &quot;gt90&quot;;
-      else if (num(c[12]) != null) b = &quot;gt60&quot;;
-      else if (num(c[11]) != null) b = &quot;lt60&quot;;
-      var days = hv != null ? hv : (num(c[13]) != null ? num(c[13]) : num(c[12]) != null ? num(c[12]) : num(c[11]));
-      if (!b &amp;&amp; days != null) b = days &gt; 90 ? &quot;gt90&quot; : days &gt;= 60 ? &quot;gt60&quot; : &quot;lt60&quot;;
-      var ad = autoDays(c[10]);
-      if (ad != null) { days = ad; b = ad &gt; 90 ? &quot;gt90&quot; : ad &gt;= 60 ? &quot;gt60&quot; : &quot;lt60&quot;; }
+      if (String(c[M.leasing]).trim().toLowerCase() !== &quot;cash&quot;) return;
+      var rr = raw &amp;&amp; raw[ix];
+      var tm = stampMs(rr &amp;&amp; rr[10] !== undefined &amp;&amp; rr[10] !== &quot;&quot; ? rr[10] : c[10]);
+      var days = tm != null ? Math.round((t0 - tm) / 86400000) : null;
+      if (days != null &amp;&amp; days &lt; 0) days = 0;
+      var b = days == null ? &quot;&quot; : days &gt; 90 ? &quot;gt90&quot; : days &gt;= 60 ? &quot;gt60&quot; : &quot;lt60&quot;;
+      var L = lookup ? lookup[normKey(c[M.bast])] : null;
+      var sales = L ? L.sales : (M.salesF &gt;= 0 ? cleanName(c[M.salesF]) : &quot;&quot;);
+      var sup = L ? L.sup : (M.supF &gt;= 0 ? c[M.supF] : &quot;&quot;);
+      var dv = L &amp;&amp; L.div ? L.div : (M.divF &gt;= 0 ? String(c[M.divF] == null ? &quot;&quot; : c[M.divF]).trim() : &quot;&quot;);
       res.push({
-        c: [c[1], c[2], c[3], c[6], &quot;Cash&quot;, cleanName(c[20]), c[21]].map(function (x) { return String(x == null ? &quot;&quot; : x).trim(); }),
+        c: [c[1], c[2], c[3], c[6], &quot;Cash&quot;, sales, sup].map(function (x) { return String(x == null ? &quot;&quot; : x).trim(); }),
         days: days, b: b, blank: String(c[8] == null ? &quot;&quot; : c[8]).trim() === &quot;&quot;,
         terima: normDate(c[10]),
-        ambil: ambilFn ? ambilFn(ix) : normStamp(c[23]),
-        bpkb: String(c[9] == null ? &quot;&quot; : c[9]).trim()
+        ambil: ambilFn ? ambilFn(ix, M.serah) : normStamp(c[M.serah]),
+        bpkb: String(c[9] == null ? &quot;&quot; : c[9]).trim(),
+        div: dv, miss: !L
       });
     });
     return res;
@@ -2279,7 +2409,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
   var data = {}, per = {}, perISO = {};
   DIVISIONS.forEach(function (d) { data[d] = []; per[d] = &quot;&quot;; perISO[d] = &quot;&quot;; });
   var active = DIVISIONS[0];
-  var liveOK = false, loaded = false, lastRead = 0;
+  var liveOK = false, loaded = false, lastRead = 0, lookupOK = true;
   var mcp = null, watching = false, inFlight = false, starting = false, directOn = false, manual = false;
   var toastT = null;
 
@@ -2317,13 +2447,16 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     setLive(&quot;ok&quot;, &quot;Live &amp;middot; tersinkron &lt;b&gt;&quot; + esc(stamp(ts)) + &quot;&lt;/b&gt; &amp;middot; otomatis tiap &quot; + REFRESH_TXT,
       &quot;\u2713 Semua data diperbarui \u2014 &quot; + nf.format(totalUnits()) + &quot; unit Cash cabang &quot; + DIVISIONS[0] + &quot;, &quot; + stampLong(ts));
     liveOK = true; loaded = true; lastRead = Date.now();
+    var miss = 0; DIVISIONS.forEach(function (d) { data[d].forEach(function (r) { if (r.miss) miss++; }); });
+    var note = !lookupOK ? &#x27; Sheet &quot;Data&quot; tidak terbaca: nama sales, supervisor dan divisi memakai kolom sheet cabang.&#x27; : (miss ? &quot; &quot; + nf.format(miss) + &#x27; unit tidak ditemukan di sheet &quot;Data&quot; (memakai kolom sheet cabang).&#x27; : &quot;&quot;);
+    if (note) { el(&quot;bar&quot;).textContent += note; el(&quot;bar&quot;).className = &quot;bar warn&quot;; }
     renderAll();
   }
 
   /* ---------- baca workbook (xlsx) dari Google Drive ---------- */
   // Kolom X &quot;Serah Tanggal&quot;: sel tanggal dibaca dari angka aslinya (tidak tergantung format tampilan), sel teks apa adanya
-  function ambilCell(ws, r) {
-    var cell = ws[XLSX.utils.encode_cell({ r: r, c: 23 })];
+  function ambilCell(ws, r, col) {
+    var cell = ws[XLSX.utils.encode_cell({ r: r, c: col == null ? 23 : col })];
     if (!cell || cell.v === undefined || cell.v === null || cell.v === &quot;&quot;) return &quot;&quot;;
     var looksDate = /^\s*\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{1,4}/.test(String(cell.w || &quot;&quot;));
     if (cell.t === &quot;n&quot; &amp;&amp; ((cell.z &amp;&amp; XLSX.SSF &amp;&amp; XLSX.SSF.is_date(cell.z)) || looksDate) &amp;&amp; XLSX.SSF &amp;&amp; XLSX.SSF.parse_date_code) {
@@ -2337,14 +2470,16 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
   }
 
   function handleWB(wb, ts) {
-    var got = {}, marks = {};
+    var got = {}, marks = {}, look = null, dws = wb.Sheets[&quot;Data&quot;];
+    if (dws) look = buildLookup(XLSX.utils.sheet_to_json(dws, { header: 1, raw: false, defval: &quot;&quot; }));
+    lookupOK = !!look;
     DIVISIONS.forEach(function (d) {
       var ws = wb.Sheets[d];
       if (!ws) throw { code: &quot;struktur&quot;, message: &#x27;Sheet &quot;&#x27; + d + &#x27;&quot; tidak ditemukan di Google Sheet.&#x27; };
       var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: &quot;&quot;, dateNF: &quot;dd/mm/yyyy&quot; });
       var rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: &quot;&quot; });
       var r0 = XLSX.utils.decode_range(ws[&quot;!ref&quot;] || &quot;A1&quot;).s.r;
-      got[d] = extract(rows, rawRows, function (ix) { return ambilCell(ws, r0 + ix); }).map(function (r) { r.div = d; return r; }); marks[d] = findMarker(rows);
+      got[d] = extract(rows, rawRows, function (ix, col) { return ambilCell(ws, r0 + ix, col); }, look).map(function (r) { r.div = r.div || d; return r; }); marks[d] = findMarker(rows);
     });
     var prev = perFor(active);
     DIVISIONS.forEach(function (d) { data[d] = got[d]; per[d] = marks[d]; perISO[d] = markerISO(marks[d]); });
@@ -2419,16 +2554,20 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
   function directOnce() {
     if (inFlight) return Promise.resolve();
     inFlight = true; setLive(&quot;off busy&quot;, &quot;Membaca Google Sheet&quot;, &quot;Mengambil data dari Google Sheets...&quot;);
-    return Promise.all(DIVISIONS.map(function (d) {
+    return fetch(gvizUrl(&quot;Data&quot;), { cache: &quot;no-store&quot; })
+      .then(function (r) { if (!r.ok) throw new Error(&quot;HTTP &quot; + r.status); return r.text(); })
+      .then(function (t) { if (/^\s*&lt;/.test(t)) throw new Error(&quot;bukan CSV&quot;); return buildLookup(parseCSV(t.replace(/^\uFEFF/, &quot;&quot;))); })
+      .catch(function () { return null; })
+      .then(function (look) { lookupOK = !!look; return Promise.all(DIVISIONS.map(function (d) {
       return fetch(gvizUrl(d), { cache: &quot;no-store&quot; })
         .then(function (r) { if (!r.ok) throw new Error(&quot;HTTP &quot; + r.status); return r.text(); })
         .then(function (t) {
           if (/^\s*&lt;/.test(t)) throw new Error(&quot;bukan CSV&quot;);
           var rows = parseCSV(t.replace(/^\uFEFF/, &quot;&quot;));
-          return { d: d, rows: extract(rows).map(function (x) { x.div = d; return x; }), mark: findMarker(rows), ok: true };
+          return { d: d, rows: extract(rows, null, null, look).map(function (x) { x.div = x.div || d; return x; }), mark: findMarker(rows), ok: true };
         })
         .catch(function () { return { d: d, ok: false }; });
-    })).then(function (results) {
+    })); }).then(function (results) {
       var okN = 0, fail = [];
       results.forEach(function (r) {
         if (r.ok) { data[r.d] = r.rows; per[r.d] = r.mark; perISO[r.d] = markerISO(r.mark); okN++; }
