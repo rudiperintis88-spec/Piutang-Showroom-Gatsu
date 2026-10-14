@@ -481,6 +481,23 @@
   .pr-head h3{font-family:var(--serif);font-size:22px;margin:0}
   .pr-head span{color:var(--muted);font-size:13px;font-family:var(--mono)}
   .pr-tools{display:flex;gap:8px;align-items:center}
+
+  .pr-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border:1px solid var(--line,#d9dde3);border-top:0;border-bottom:0;background:var(--panel,#fff)}
+  .pr-filters select{background:var(--panel,#fff);border:1px solid var(--line,#d9dde3);border-radius:8px;padding:7px 10px;font-size:12.5px;color:inherit;font-family:inherit;cursor:pointer;max-width:220px}
+  .pr-filters .pf-reset{background:rgba(0,0,0,.05);border:1px solid var(--line,#d9dde3);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;color:inherit;font-family:inherit}
+  .pr-filters .pf-count{font-size:12px;color:var(--muted,#6b7280);margin-left:auto}
+  .pr-wrap table.detail thead th[data-sort]{cursor:pointer;user-select:none;white-space:nowrap}
+  .pr-wrap table.detail thead th[data-sort]:hover{color:var(--ink,#111)}
+  .pr-wrap table.detail thead th .sa{font-size:9px;margin-left:4px;opacity:.55}
+  .pr-wrap table.detail thead th .sa.on{opacity:1}
+
+  /* Prioritas Penagihan &amp; tabel rincian: semua tulisan satu baris, ukuran huruf menyesuaikan lebar layar (tidak terpotong / turun baris) */
+  .table-scroll,.leasing-table-scroll,.pr-wrap .table-scroll{overflow-x:auto !important}
+  .pr-wrap table.detail{width:100% !important;min-width:0 !important}
+  .pr-wrap table.detail thead th,.table-scroll table.detail:not(#followupTable) thead th,.leasing-table-scroll table.detail thead th{white-space:nowrap !important;overflow-wrap:normal !important;word-break:keep-all !important;font-size:clamp(10px,.78vw,12px) !important;padding:9px 8px !important}
+  .pr-wrap table.detail tbody tr.pr-row td,.table-scroll table.detail:not(#followupTable) tbody td,.leasing-table-scroll table.detail tbody td{white-space:nowrap !important;overflow-wrap:normal !important;word-break:keep-all !important;font-size:clamp(10px,.82vw,12.5px) !important;padding:10px 8px !important}
+  .pr-wrap table.detail tbody tr.pr-detail td{white-space:normal !important;overflow-wrap:break-word !important;font-size:13px !important}
+  .pr-wrap .pr-badge{white-space:nowrap !important;display:inline-block}
   .pr-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--cat-14-wash);border:1px solid var(--cat-14);border-bottom:0;border-radius:12px 12px 0 0;padding:16px 22px;color:var(--cat-over)}
   .pr-banner b{font-family:var(--serif);font-size:19px}
   .pr-banner .pr-sum{color:var(--ink);font-size:14px}
@@ -1382,25 +1399,96 @@ function fuExportPdf() {
   doc.save(fuFileName(&#x27;pdf&#x27;));
 }
 
+
+/* ---------------- Prioritas Penagihan: filter Leasing / Cabang / Supervisor + urut kolom (klik judul) ---------------- */
+const prState = { key: &#x27;hari&#x27;, dir: &#x27;desc&#x27;, leasing: &#x27;&#x27;, cabang: &#x27;&#x27;, spv: &#x27;&#x27; };
+function prLeasing(r) { return (r.leasing &amp;&amp; r.leasing !== &#x27;-&#x27;) ? r.leasing : (r.cara === &#x27;Tunai&#x27; ? &#x27;Cash&#x27; : &#x27;-&#x27;); }
+function prSpv(r) { return r.supervisor || &#x27;\u2013&#x27;; }
+function prVal(r, k) {
+  switch (k) {
+    case &#x27;name&#x27;: return r.nama || &#x27;&#x27;;
+    case &#x27;faktur&#x27;: return r.faktur || &#x27;&#x27;;
+    case &#x27;cabang&#x27;: return TARGET_DIVISI;
+    case &#x27;metode&#x27;: return r.cara || &#x27;&#x27;;
+    case &#x27;leasing&#x27;: return prLeasing(r);
+    case &#x27;jumlah&#x27;: return Number(r.jumlah) || 0;
+    case &#x27;jto&#x27;: case &#x27;no&#x27;: return -(r.hari ?? 0);
+    case &#x27;hari&#x27;: return r.hari ?? 0;
+    case &#x27;sales&#x27;: return r.salesman || &#x27;&#x27;;
+    case &#x27;spv&#x27;: return prSpv(r);
+  }
+  return &#x27;&#x27;;
+}
+function prMatch(r) {
+  return (!prState.leasing || prLeasing(r) === prState.leasing) &amp;&amp;
+         (!prState.cabang || TARGET_DIVISI === prState.cabang) &amp;&amp;
+         (!prState.spv || prSpv(r) === prState.spv);
+}
+function prSort(list) {
+  const dir = prState.dir === &#x27;asc&#x27; ? 1 : -1, k = prState.key;
+  return list.slice().sort((a, b) =&gt; {
+    const va = prVal(a, k), vb = prVal(b, k);
+    let c = (typeof va === &#x27;number&#x27; &amp;&amp; typeof vb === &#x27;number&#x27;) ? va - vb : String(va).localeCompare(String(vb), &#x27;id&#x27;, { numeric: true, sensitivity: &#x27;base&#x27; });
+    if (c === 0) c = (b.hari ?? 0) - (a.hari ?? 0);
+    return c * dir;
+  });
+}
+function prFixFilters(all) {
+  const has = (fn, v) =&gt; all.some(r =&gt; fn(r) === v);
+  if (prState.leasing &amp;&amp; !has(prLeasing, prState.leasing)) prState.leasing = &#x27;&#x27;;
+  if (prState.spv &amp;&amp; !has(prSpv, prState.spv)) prState.spv = &#x27;&#x27;;
+  if (prState.cabang &amp;&amp; prState.cabang !== TARGET_DIVISI) prState.cabang = &#x27;&#x27;;
+}
+function prBar(all, list) {
+  const uniq = fn =&gt; Array.from(new Set(all.map(fn))).sort((a, b) =&gt; String(a).localeCompare(String(b), &#x27;id&#x27;, { numeric: true }));
+  const sel = (k, label, vals, cur) =&gt; `&lt;select data-pf=&quot;${k}&quot; title=&quot;Filter ${label}&quot;&gt;&lt;option value=&quot;&quot;&gt;Semua ${label}&lt;/option&gt;${vals.map(v =&gt; `&lt;option value=&quot;${esc(v)}&quot;${v === cur ? &#x27; selected&#x27; : &#x27;&#x27;}&gt;${esc(v)}&lt;/option&gt;`).join(&#x27;&#x27;)}&lt;/select&gt;`;
+  return `&lt;div class=&quot;pr-filters&quot;&gt;${sel(&#x27;leasing&#x27;, &#x27;Leasing&#x27;, uniq(prLeasing), prState.leasing)}${sel(&#x27;cabang&#x27;, &#x27;Cabang&#x27;, [TARGET_DIVISI], prState.cabang)}${sel(&#x27;spv&#x27;, &#x27;Supervisor&#x27;, uniq(prSpv), prState.spv)}&lt;button type=&quot;button&quot; class=&quot;pf-reset&quot;&gt;Reset filter&lt;/button&gt;&lt;span class=&quot;pf-count&quot;&gt;${list.length} dari ${all.length} faktur&lt;/span&gt;&lt;/div&gt;`;
+}
+function prTh(k, label, cls) {
+  const on = prState.key === k;
+  return `&lt;th${cls ? ` class=&quot;${cls}&quot;` : &#x27;&#x27;} data-sort=&quot;${k}&quot;&gt;${label}&lt;span class=&quot;sa${on ? &#x27; on&#x27; : &#x27;&#x27;}&quot;&gt;${on ? (prState.dir === &#x27;asc&#x27; ? &#x27;\u25B2&#x27; : &#x27;\u25BC&#x27;) : &#x27;\u21C5&#x27;}&lt;/span&gt;&lt;/th&gt;`;
+}
+(function () {
+  const box = document.getElementById(&#x27;prioritasBox&#x27;);
+  if (!box) return;
+  box.addEventListener(&#x27;change&#x27;, e =&gt; {
+    const k = e.target &amp;&amp; e.target.dataset &amp;&amp; e.target.dataset.pf;
+    if (!k) return;
+    prState[k] = e.target.value; renderPrioritasTab(true);
+  });
+  box.addEventListener(&#x27;click&#x27;, e =&gt; {
+    if (e.target.closest(&#x27;.pf-reset&#x27;)) { prState.leasing = prState.cabang = prState.spv = &#x27;&#x27;; renderPrioritasTab(true); return; }
+    const th = e.target.closest(&#x27;th[data-sort]&#x27;);
+    if (!th) return;
+    const k = th.dataset.sort;
+    if (prState.key === k) prState.dir = prState.dir === &#x27;asc&#x27; ? &#x27;desc&#x27; : &#x27;asc&#x27;;
+    else { prState.key = k; prState.dir = (k === &#x27;jumlah&#x27; || k === &#x27;hari&#x27;) ? &#x27;desc&#x27; : &#x27;asc&#x27;; }
+    renderPrioritasTab(true);
+  });
+})();
+
 function renderPrioritasTab(force) {
   const box = document.getElementById(&#x27;prioritasBox&#x27;);
   if (!box) return;
   // jangan timpa ketikan yang sedang berlangsung saat sinkronisasi otomatis
   if (!force &amp;&amp; [...box.querySelectorAll(&#x27;.fu-in&#x27;)].some(i =&gt; i === document.activeElement || (i.dataset.k !== &#x27;pic&#x27; &amp;&amp; i.value))) return;
-  const list = rows.filter(r =&gt; (r.hari ?? -9999) &gt; 26).sort((a, b) =&gt; (b.hari ?? 0) - (a.hari ?? 0));
+  const allP = rows.filter(r =&gt; (r.hari ?? -9999) &gt; 15);
+  prFixFilters(allP);
+  const list = prSort(allP.filter(prMatch));
   const total = list.reduce((s, r) =&gt; s + (Number(r.jumlah) || 0), 0);
   const debs = new Set(list.map(r =&gt; r.nama)).size;
-  let h = `&lt;div class=&quot;pr-head&quot;&gt;&lt;h3&gt;Prioritas Penagihan&lt;/h3&gt;&lt;div class=&quot;pr-tools&quot;&gt;&lt;span&gt;faktur dengan umur &amp;gt; 26 hari &amp;middot; klik baris untuk catatan &amp;amp; tugas&lt;/span&gt;&lt;span id=&quot;fuSyncStatus&quot;&gt;${fuStatusHtml()}&lt;/span&gt;&lt;button class=&quot;fu-ghost&quot; data-a=&quot;xpdf&quot;${fuHasNotes() ? &#x27;&#x27; : &#x27; disabled title=&quot;Belum ada catatan untuk direkap&quot;&#x27;}&gt;Export PDF&lt;/button&gt;&lt;button class=&quot;fu-ghost&quot; data-a=&quot;xxls&quot;${fuHasNotes() ? &#x27;&#x27; : &#x27; disabled title=&quot;Belum ada catatan untuk direkap&quot;&#x27;}&gt;Export Excel&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`;
-  if (!list.length) h += &#x27;&lt;div class=&quot;pr-empty&quot;&gt;Tidak ada faktur dengan umur &amp;gt; 26 hari saat ini.&lt;/div&gt;&#x27;;
+  let h = `&lt;div class=&quot;pr-head&quot;&gt;&lt;h3&gt;Prioritas Penagihan&lt;/h3&gt;&lt;div class=&quot;pr-tools&quot;&gt;&lt;span&gt;faktur dengan umur &amp;gt; 15 hari &amp;middot; klik baris untuk catatan &amp;amp; tugas&lt;/span&gt;&lt;span id=&quot;fuSyncStatus&quot;&gt;${fuStatusHtml()}&lt;/span&gt;&lt;button class=&quot;fu-ghost&quot; data-a=&quot;xpdf&quot;${fuHasNotes() ? &#x27;&#x27; : &#x27; disabled title=&quot;Belum ada catatan untuk direkap&quot;&#x27;}&gt;Export PDF&lt;/button&gt;&lt;button class=&quot;fu-ghost&quot; data-a=&quot;xxls&quot;${fuHasNotes() ? &#x27;&#x27; : &#x27; disabled title=&quot;Belum ada catatan untuk direkap&quot;&#x27;}&gt;Export Excel&lt;/button&gt;&lt;/div&gt;&lt;/div&gt;`;
+  if (allP.length) h += prBar(allP, list);
+  if (!list.length) h += &#x27;&lt;div class=&quot;pr-empty&quot;&gt;&#x27; + (allP.length ? &#x27;Tidak ada faktur yang sesuai filter.&#x27; : &#x27;Tidak ada faktur dengan umur &amp;gt; 15 hari saat ini.&#x27;) + &#x27;&lt;/div&gt;&#x27;;
   else {
     h += `&lt;div class=&quot;pr-banner&quot;&gt;&lt;div&gt;&lt;span class=&quot;pr-dot&quot;&gt;&lt;/span&gt;&lt;b&gt;${list.length} faktur butuh tindak lanjut segera&lt;/b&gt;&lt;/div&gt;&lt;span class=&quot;pr-sum&quot;&gt;total tertunggak &lt;em&gt;Rp ${fmtMoney(total)}&lt;/em&gt; &amp;middot; ${debs} debitur&lt;/span&gt;&lt;/div&gt;
-    &lt;div class=&quot;pr-wrap&quot;&gt;&lt;div class=&quot;table-scroll&quot;&gt;&lt;table class=&quot;detail&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;No&lt;/th&gt;&lt;th&gt;Debitur&lt;/th&gt;&lt;th&gt;No. Faktur&lt;/th&gt;&lt;th&gt;Cabang&lt;/th&gt;&lt;th&gt;Metode&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Jumlah&lt;/th&gt;&lt;th&gt;Tgl. Jatuh Tempo&lt;/th&gt;&lt;th class=&quot;num&quot;&gt;Umur&lt;/th&gt;&lt;th&gt;Sales PIC&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;`;
+    &lt;div class=&quot;pr-wrap&quot;&gt;&lt;div class=&quot;table-scroll&quot;&gt;&lt;table class=&quot;detail&quot;&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;&lt;/th&gt;${prTh(&#x27;no&#x27;, &#x27;No&#x27;, &#x27;num&#x27;)}${prTh(&#x27;name&#x27;, &#x27;Debitur&#x27;)}${prTh(&#x27;faktur&#x27;, &#x27;No. Faktur&#x27;)}${prTh(&#x27;cabang&#x27;, &#x27;Cabang&#x27;)}${prTh(&#x27;leasing&#x27;, &#x27;Leasing&#x27;)}${prTh(&#x27;jumlah&#x27;, &#x27;Jumlah&#x27;, &#x27;num&#x27;)}${prTh(&#x27;jto&#x27;, &#x27;Tgl. Jatuh Tempo&#x27;)}${prTh(&#x27;hari&#x27;, &#x27;Umur&#x27;, &#x27;num&#x27;)}${prTh(&#x27;sales&#x27;, &#x27;Sales PIC&#x27;)}${prTh(&#x27;spv&#x27;, &#x27;Supervisor&#x27;)}&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;`;
     list.forEach((r, i) =&gt; {
       const open = fuOpen.has(r.faktur), x = fuRec(r, false);
       const nt = x ? x.notes.length : 0, tk = x ? x.tasks.filter(t =&gt; !t.done &amp;&amp; !t.del).length : 0;
-      const metode = r.cara === &#x27;Tunai&#x27; ? &#x27;&lt;span class=&quot;pr-red&quot;&gt;Tunai (langsung)&lt;/span&gt;&#x27; : `Kredit &amp;middot; ${esc(r.leasing)}`;
-      h += `&lt;tr class=&quot;pr-row&quot; data-f=&quot;${esc(r.faktur)}&quot;&gt;&lt;td&gt;&lt;span class=&quot;pr-chev&quot;&gt;${open ? &#x27;&amp;#9662;&#x27; : &#x27;&amp;#9656;&#x27;}&lt;/span&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;${i + 1}&lt;/td&gt;&lt;td class=&quot;nama&quot;&gt;${esc(r.nama)}&lt;br&gt;&lt;small style=&quot;color:var(--muted)&quot;&gt;${esc(r.noCust || &#x27;&#x27;)}&lt;/small&gt;&lt;/td&gt;&lt;td&gt;${esc(r.faktur)}&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;pr-badge&quot;&gt;${TARGET_DIVISI}&lt;/span&gt;&lt;/td&gt;&lt;td&gt;${metode}&lt;/td&gt;&lt;td class=&quot;num money&quot;&gt;Rp ${fmtMoney(r.jumlah)}&lt;/td&gt;&lt;td&gt;${fmtDateShort(r.tglJto)}&lt;/td&gt;&lt;td class=&quot;num pr-red&quot;&gt;${r.hari} hr&lt;/td&gt;&lt;td&gt;${esc(r.salesman || &#x27;\u2013&#x27;)}${nt ? `&lt;span class=&quot;pr-cnt&quot;&gt;${nt} catatan&lt;/span&gt;` : &#x27;&#x27;}${tk ? `&lt;span class=&quot;pr-cnt&quot;&gt;${tk} tugas&lt;/span&gt;` : &#x27;&#x27;}&lt;/td&gt;&lt;/tr&gt;`;
-      if (open) h += `&lt;tr class=&quot;pr-detail&quot;&gt;&lt;td colspan=&quot;10&quot;&gt;${fuDetail(r)}&lt;/td&gt;&lt;/tr&gt;`;
+      const metode = r.cara === &#x27;Tunai&#x27; ? &#x27;&lt;span class=&quot;pr-red&quot;&gt;Tunai (langsung)&lt;/span&gt;&#x27; : &#x27;Kredit&#x27;;
+      h += `&lt;tr class=&quot;pr-row&quot; data-f=&quot;${esc(r.faktur)}&quot;&gt;&lt;td&gt;&lt;span class=&quot;pr-chev&quot;&gt;${open ? &#x27;&amp;#9662;&#x27; : &#x27;&amp;#9656;&#x27;}&lt;/span&gt;&lt;/td&gt;&lt;td class=&quot;num&quot;&gt;${i + 1}&lt;/td&gt;&lt;td class=&quot;nama&quot;&gt;${esc(r.nama)}&lt;br&gt;&lt;small style=&quot;color:var(--muted)&quot;&gt;${esc(r.noCust || &#x27;&#x27;)}&lt;/small&gt;&lt;/td&gt;&lt;td&gt;${esc(r.faktur)}&lt;/td&gt;&lt;td&gt;&lt;span class=&quot;pr-badge&quot;&gt;${TARGET_DIVISI}&lt;/span&gt;&lt;/td&gt;&lt;td&gt;${esc(prLeasing(r))}&lt;/td&gt;&lt;td class=&quot;num money&quot;&gt;Rp ${fmtMoney(r.jumlah)}&lt;/td&gt;&lt;td&gt;${fmtDateShort(r.tglJto)}&lt;/td&gt;&lt;td class=&quot;num pr-red&quot;&gt;${r.hari} hr&lt;/td&gt;&lt;td&gt;${esc(r.salesman || &#x27;\u2013&#x27;)}${nt ? `&lt;span class=&quot;pr-cnt&quot;&gt;${nt} catatan&lt;/span&gt;` : &#x27;&#x27;}${tk ? `&lt;span class=&quot;pr-cnt&quot;&gt;${tk} tugas&lt;/span&gt;` : &#x27;&#x27;}&lt;/td&gt;&lt;td&gt;${esc(prSpv(r))}&lt;/td&gt;&lt;/tr&gt;`;
+      if (open) h += `&lt;tr class=&quot;pr-detail&quot;&gt;&lt;td colspan=&quot;11&quot;&gt;${fuDetail(r)}&lt;/td&gt;&lt;/tr&gt;`;
     });
     h += &#x27;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&#x27;;
   }
@@ -1730,10 +1818,6 @@ function extractGatsuFromWorkbook(wb) {
       followup: (followupRaw === &quot;#N/A&quot; ? null : followupRaw),
     });
   }
-  try {
-    const nm = PERFAKTUR_SHEETS.find(n =&gt; wb.Sheets[n]);
-    applyPerfaktur(out, nm ? buildPerfaktur(XLSX.utils.sheet_to_json(wb.Sheets[nm], { header: 1, raw: false, defval: &quot;&quot;, dateNF: &quot;dd/mm/yyyy&quot; })) : null);
-  } catch (e) { perfakturState = &#x27;fail&#x27;; }
   return { rows: out, reportDateLabel };
 }
 
@@ -1754,7 +1838,7 @@ function applyNewData(list, reportDateLabel, syncedAt) {
   const jam = String(syncedAt.getHours()).padStart(2,&#x27;0&#x27;);
   const menit = String(syncedAt.getMinutes()).padStart(2,&#x27;0&#x27;);
   lastSyncedLabel = `${syncedAt.getDate()} ${bulanFull[syncedAt.getMonth()]} ${syncedAt.getFullYear()}, ${jam}:${menit}`;
-  setSync(&#x27;live&#x27;, `Live &amp;middot; tersinkron &lt;strong&gt;${lastSyncedLabel}&lt;/strong&gt; &amp;middot; otomatis tiap 2 menit` + pfNote());
+  setSync(&#x27;live&#x27;, `Live &amp;middot; tersinkron &lt;strong&gt;${lastSyncedLabel}&lt;/strong&gt; &amp;middot; otomatis tiap 2 menit`);
 }
 
 /* ---------- Sinkronisasi live: CSV &quot;Publish to web&quot; (cara baca sama dengan dashboard gabungan) ---------- */
@@ -1762,6 +1846,74 @@ const PUB_BASE = &#x27;https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8rWnYng
 const PIUTANG_CSV_URL = PUB_BASE + &#x27;?gid=860325626&amp;single=true&amp;output=csv&#x27;; // tab Sheet1 (piutang)
 const SALES_CSV_URL = PUB_BASE + &#x27;?gid=0&amp;single=true&amp;output=csv&#x27;;           // tab Data (penjualan)
 const SYNC_MS = 120000; // 2 menit
+
+/* ===== Sheet &quot;Data PerFaktur&quot;: Tgl Buat Tagihan &amp; Tgl Barcode dibaca per Faktur No. (bukan dari kolom O/P Sheet1) ===== */
+const PERFAKTUR_SHEETS = [&#x27;Data Per Faktur&#x27;, &#x27;Data PerFaktur&#x27;];
+const PERFAKTUR_FILE_ID = &#x27;1ul2WqwEb4X66Q6CYdycNvtyaLu08axFkZL75FI-qdmM&#x27;;
+const PERFAKTUR_PUB_GID = &#x27;&#x27;; // opsional: isi angka gid sheet &quot;Data PerFaktur&quot; (dari alamat #gid=...) bila file Google Sheet tidak dibagikan &quot;Siapa saja yang memiliki link&quot; tetapi sudah di-publish ke web
+/* ===== Sheet &quot;Data&quot;: Type, Divisi, Cara Pembelian, Leasing, Salesman, Supervisor dicocokkan per Faktur No. (bukan dari Sheet1) ===== */
+let dsLast = null;
+function dsDivisi(r) { let d = String(r[9] == null ? &#x27;&#x27; : r[9]).trim(); if (!d) { const raw = String(r[8] == null ? &#x27;&#x27; : r[8]).trim(); if (raw) d = raw.replace(/\s+mobil$/i, &#x27;&#x27;); } return d; }
+function dsTxt(v) { return pfClean(v); }
+function buildDataLookup(rows) {
+  let h = -1;
+  for (let i = 0; i &lt; rows.length &amp;&amp; i &lt; 40; i++) { const r = rows[i]; if (r &amp;&amp; String(r[0]).trim() === &#x27;No&#x27; &amp;&amp; String(r[1]).trim() === &#x27;Tanggal&#x27;) { h = i; break; } }
+  if (h &lt; 0) return null;
+  const map = {}; let n = 0;
+  for (let i = h + 1; i &lt; rows.length; i++) {
+    const r = rows[i], k = pfKey(r &amp;&amp; r[2]);
+    if (!k) continue;
+    map[k] = { type: dsTxt(r[5]), cara: dsTxt(r[7]), divisi: dsDivisi(r), leasing: dsTxt(r[10]), sales: dsTxt(r[11]), spv: dsTxt(r[12]) };
+    n++;
+  }
+  return n ? map : null;
+}
+async function fetchDataLookup() {
+  try { const m = buildDataLookup(await pfFetchRows(SALES_CSV_URL)); if (m) { dsLast = m; return m; } }
+  catch (e) { console.warn(&#x27;Sheet Data belum terbaca:&#x27;, e); }
+  return dsLast;
+}
+let pfLast = null;
+function pfKey(v) { return String(v == null ? &#x27;&#x27; : v).replace(/\s+/g, &#x27; &#x27;).trim().toUpperCase(); }
+function pfClean(v) { v = String(v == null ? &#x27;&#x27; : v).trim(); return /^#(N\/A|REF!|VALUE!|NAME\?|DIV\/0!|NULL!|NUM!|ERROR!)/i.test(v) || /^\\?-+$/.test(v) ? &#x27;&#x27; : v; }
+function buildPerFaktur(rows) {
+  for (let i = 0; i &lt; rows.length &amp;&amp; i &lt; 15; i++) {
+    const r = rows[i] || [];
+    const hs = r.map(c =&gt; String(c == null ? &#x27;&#x27; : c).toLowerCase().replace(/\s+/g, &#x27; &#x27;).trim());
+    let f = -1, t = -1, b = -1;
+    hs.forEach((s, j) =&gt; { if (f &lt; 0 &amp;&amp; /faktur/.test(s) &amp;&amp; !/tgl|tanggal/.test(s)) f = j; });
+    hs.forEach((s, j) =&gt; { if (t &lt; 0 &amp;&amp; /tagihan/.test(s) &amp;&amp; /tgl|tanggal|buat/.test(s)) t = j; });
+    if (t &lt; 0) hs.forEach((s, j) =&gt; { if (t &lt; 0 &amp;&amp; /tagihan/.test(s)) t = j; });
+    hs.forEach((s, j) =&gt; { if (b &lt; 0 &amp;&amp; /bar(c|k)ode/.test(s.replace(/[^a-z]/g, &#x27;&#x27;)) &amp;&amp; /tgl|tanggal/.test(s)) b = j; });
+    if (b &lt; 0) hs.forEach((s, j) =&gt; { if (b &lt; 0 &amp;&amp; /bar(c|k)ode/.test(s.replace(/[^a-z]/g, &#x27;&#x27;))) b = j; });
+    if (f &lt; 0 || (t &lt; 0 &amp;&amp; b &lt; 0)) continue;
+    const map = {}; let n = 0;
+    for (let k = i + 1; k &lt; rows.length; k++) {
+      const row = rows[k], key = pfKey(row &amp;&amp; row[f]);
+      if (!key) continue;
+      map[key] = { tagih: t &gt; -1 ? pfClean(row[t]) : &#x27;&#x27;, barcode: b &gt; -1 ? pfClean(row[b]) : &#x27;&#x27; };
+      n++;
+    }
+    return n ? map : null;
+  }
+  return null;
+}
+async function pfFetchRows(url) {
+  const res = await fetch(url, { cache: &#x27;no-store&#x27; });
+  if (!res.ok) throw new Error(&#x27;HTTP &#x27; + res.status);
+  const t = await res.text();
+  if (/^\s*&lt;/.test(t)) throw new Error(&#x27;bukan CSV&#x27;);
+  return parseCSVFull(t.replace(/^\uFEFF/, &#x27;&#x27;));
+}
+async function fetchPerFaktur() {
+  const urls = PERFAKTUR_SHEETS.map(n =&gt; &#x27;https://docs.google.com/spreadsheets/d/&#x27; + PERFAKTUR_FILE_ID + &#x27;/gviz/tq?tqx=out:csv&amp;headers=0&amp;sheet=&#x27; + encodeURIComponent(n));
+  if (PERFAKTUR_PUB_GID) urls.push(PUB_BASE + &#x27;?gid=&#x27; + PERFAKTUR_PUB_GID + &#x27;&amp;single=true&amp;output=csv&#x27;);
+  for (const u of urls) {
+    try { const m = buildPerFaktur(await pfFetchRows(u)); if (m) { pfLast = m; return m; } }
+    catch (e) { console.warn(&#x27;Data PerFaktur belum terbaca:&#x27;, e); }
+  }
+  return pfLast; // gagal: pakai data terakhir yang berhasil; bila belum pernah berhasil -&gt; null (cadangan: kolom O/P Sheet1)
+}
 
 function detectDelimiter(text) {
   const lines = text.split(/\r?\n/).filter(l =&gt; l.trim().length &gt; 0).slice(0, 15);
@@ -1814,7 +1966,7 @@ function csvIso(s, fmt) {
   }
   return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null;
 }
-function parsePiutangCsv(csv) {
+function parsePiutangCsv(csv, pf, ds) {
   let label = null, h = -1;
   for (let i = 0; i &lt; csv.length &amp;&amp; i &lt; 40; i++) {
     const row = csv[i] || [];
@@ -1826,15 +1978,17 @@ function parsePiutangCsv(csv) {
   const fmt = detectDateFormat(body.map(r =&gt; r[5]));
   const nm = v =&gt; { v = cellStr(v); return v.includes(&#x27;=&#x27;) ? v.slice(v.indexOf(&#x27;=&#x27;) + 1).trim() : v; };
   const dateOrText = v =&gt; { v = cellStr(v); return csvIso(v, fmt) || (v &amp;&amp; v !== &#x27;#N/A&#x27; ? v : null); };
-  const list = body.filter(r =&gt; cellStr(r[9]) === TARGET_DIVISI).map(r =&gt; {
+  const list = body.filter(r =&gt; { const D = ds ? ds[pfKey(r[3])] : null; return ((D &amp;&amp; D.divisi) || cellStr(r[9])) === TARGET_DIVISI; }).map(r =&gt; {
     const t = cellStr(r[4]), fu = cellStr(r[16]);
+    const D = ds ? (ds[pfKey(r[3])] || null) : null; // sheet &quot;Data&quot; (cocok Faktur No.)
+    const L = pf ? (pf[pfKey(r[3])] || null) : null; // sheet &quot;Data PerFaktur&quot; (cocok Faktur No.)
     return {
       noCust: cellStr(r[1]), nama: cellStr(r[2]), faktur: cellStr(r[3]),
       top: t === &#x27;&#x27; ? 0 : (/^\d+$/.test(t) ? Number(t) : t),
-      tglJto: csvIso(r[5], fmt), jumlah: cellNum(r[6]), type: cellStr(r[8]),
-      cara: cellStr(r[10]) || &#x27;-&#x27;, leasing: cellStr(r[11]) || &#x27;-&#x27;,
-      salesman: nm(r[12]), supervisor: cellStr(r[13]),
-      tglTagih: dateOrText(r[14]), tglBarcode: dateOrText(r[15]),
+      tglJto: csvIso(r[5], fmt), jumlah: cellNum(r[6]), type: D ? D.type : cellStr(r[8]),
+      cara: (D &amp;&amp; D.cara) || cellStr(r[10]) || &#x27;-&#x27;, leasing: (D ? D.leasing : cellStr(r[11])) || &#x27;-&#x27;,
+      salesman: nm(D ? D.sales : r[12]), supervisor: D ? D.spv : cellStr(r[13]),
+      tglTagih: pf ? dateOrText((L &amp;&amp; L.tagih) || &#x27;Belum Buat Tagihan&#x27;) : dateOrText(r[14]), tglBarcode: pf ? dateOrText(L ? L.barcode : &#x27;&#x27;) : dateOrText(r[15]),
       followup: fu === &#x27;#N/A&#x27; ? null : (fu || null),
     };
   });
@@ -1846,73 +2000,6 @@ function parseSalesCsv(csv) {
   if (h &lt; 0) { const e = new Error(&#x27;Header sheet Data tidak ditemukan&#x27;); e.code = &#x27;HEADER_NOT_FOUND&#x27;; throw e; }
   SALES_DATE_FMT = detectDateFormat(csv.slice(h + 1).map(r =&gt; r &amp;&amp; r[1]));
   return mapSales(h + 1, csv.length, get);
-}
-
-/* ===== Data Perfaktur: Tgl Buat Tagihan &amp; Tgl Barcode dibaca otomatis dari sheet &quot;Data Perfaktur&quot; (dicocokkan lewat No. Faktur) =====
-   Kolom dicari lewat JUDUL (&quot;No. Faktur&quot;, &quot;Tgl Buat Tagihan&quot;, &quot;Tgl Barcode&quot;), urutan kolom bebas. Kolom O &amp; P di sheet piutang hanya cadangan
-   bila sheet Data Perfaktur tidak terbaca. Faktur yang tidak ada di Data Perfaktur / tanggalnya kosong = &quot;Belum Buat Tagihan&quot;. */
-const PERFAKTUR_FILE_ID = &#x27;1qPXn1eOM3J5ygKKSa7Ld5qmf4GCSsyS60CojPguaZ_c&#x27;;
-const PERFAKTUR_SHEETS = [&#x27;Data Perfaktur&#x27;, &#x27;Data Per Faktur&#x27;, &#x27;Data PerFaktur&#x27;, &#x27;Data per faktur&#x27;, &#x27;Data Per-Faktur&#x27;, &#x27;DataPerfaktur&#x27;];   // nama sheet dicoba berurutan
-const perfakturUrl = name =&gt; &#x27;https://docs.google.com/spreadsheets/d/&#x27; + PERFAKTUR_FILE_ID + &#x27;/gviz/tq?tqx=out:csv&amp;headers=0&amp;sheet=&#x27; + encodeURIComponent(name);
-let perfakturState = &#x27;off&#x27;;   // ok | fail (sheet tidak terbaca) | nomatch (tidak ada faktur yang cocok)
-const pfKey = v =&gt; String(v == null ? &#x27;&#x27; : v).replace(/[^A-Za-z0-9]/g, &#x27;&#x27;).toUpperCase();
-const pfHdr = v =&gt; String(v == null ? &#x27;&#x27; : v).replace(/\s+/g, &#x27; &#x27;).trim().toLowerCase();
-const pfClean = v =&gt; { const s = String(v == null ? &#x27;&#x27; : v).trim(); return (!s || s === &#x27;-&#x27; || s.charAt(0) === &#x27;#&#x27;) ? &#x27;&#x27; : s; };
-function buildPerfaktur(rows) {
-  if (!rows || !rows.length) return null;
-  for (let i = 0; i &lt; rows.length &amp;&amp; i &lt; 15; i++) {
-    const h = (rows[i] || []).map(pfHdr);
-    const find = (...res) =&gt; { for (const re of res) { const j = h.findIndex(t =&gt; re.test(t)); if (j &gt; -1) return j; } return -1; };
-    const iF = find(/^(no\.?\s*)?faktur$/, /^no\.?\s*fak/, /faktur/);
-    if (iF &lt; 0) continue;
-    const iT = find(/^(tgl|tanggal)\.?\s*buat\s*tagihan$/, /buat\s*tagihan/, /(tgl|tanggal)\.?\s*.*tagihan/, /tagihan/);
-    const iB = find(/^(tgl|tanggal)\.?\s*barcode$/, /(tgl|tanggal)\.?\s*.*barcode/, /barcode/);
-    if (iT &lt; 0 &amp;&amp; iB &lt; 0) continue;
-    const map = {};
-    for (let k = i + 1; k &lt; rows.length; k++) {
-      const r = rows[k]; if (!r) continue;
-      const key = pfKey(r[iF]); if (!key) continue;
-      const buat = iT &gt; -1 ? pfClean(r[iT]) : &#x27;&#x27;, barcode = iB &gt; -1 ? pfClean(r[iB]) : &#x27;&#x27;;
-      const old = map[key];
-      if (!old) map[key] = { buat, barcode };
-      else { if (!old.buat &amp;&amp; buat) old.buat = buat; if (!old.barcode &amp;&amp; barcode) old.barcode = barcode; }   // faktur ganda: isi yang tersedia
-    }
-    return map;
-  }
-  return null;
-}
-async function fetchPerfaktur() {
-  for (const name of PERFAKTUR_SHEETS) {
-    try {
-      const res = await fetch(perfakturUrl(name), { cache: &#x27;no-store&#x27; });
-      if (!res.ok) continue;
-      const text = await res.text();
-      if (/^\s*&lt;/.test(text)) continue;
-      const map = buildPerfaktur(parseCSVFull(text.replace(/^\uFEFF/, &#x27;&#x27;)));
-      if (map) return map;
-    } catch (e) { console.warn(&#x27;Data Perfaktur tidak terbaca (&#x27; + name + &#x27;)&#x27;, e); }
-  }
-  return null;
-}
-function applyPerfaktur(list, map) {
-  if (!map) { perfakturState = &#x27;fail&#x27;; return; }
-  let hit = 0;
-  list.forEach(r =&gt; { if (map[pfKey(r.faktur)]) hit++; });
-  if (!hit) { perfakturState = &#x27;nomatch&#x27;; return; }   // tidak ada yang cocok -&gt; kemungkinan format No. Faktur beda; pakai kolom lama
-  const vals = [];
-  Object.keys(map).forEach(k =&gt; { vals.push(map[k].buat, map[k].barcode); });
-  const fmt = detectDateFormat(vals);
-  const conv = v =&gt; v ? (csvIso(v, fmt) || v) : null;
-  list.forEach(r =&gt; {
-    const p = map[pfKey(r.faktur)];
-    const b = p &amp;&amp; p.buat ? conv(p.buat) : null;
-    r.tglTagih = (b &amp;&amp; !/^belum/i.test(b)) ? b : &#x27;Belum Buat Tagihan&#x27;;
-    r.tglBarcode = p &amp;&amp; p.barcode ? conv(p.barcode) : null;
-  });
-  perfakturState = &#x27;ok&#x27;;
-}
-function pfNote() {
-  return perfakturState === &#x27;ok&#x27; || perfakturState === &#x27;off&#x27; ? &#x27;&#x27; : &#x27; &amp;middot; &lt;span style=&quot;color:#B42318&quot;&gt;&amp;#9888; Sheet &quot;Data Perfaktur&quot; &#x27; + (perfakturState === &#x27;nomatch&#x27; ? &#x27;tidak cocok dengan No. Faktur&#x27; : &#x27;tidak terbaca&#x27;) + &#x27; &amp;mdash; Tgl Buat Tagihan &amp;amp; Tgl Barcode memakai kolom sheet piutang&lt;/span&gt;&#x27;;
 }
 
 const refreshBtn = document.getElementById(&#x27;refreshBtn&#x27;);
@@ -1938,8 +2025,7 @@ async function syncNow(isManual) {
   setRefreshBtnSpinning(true);
   if (isManual || !lastSyncedLabel) setSync(&#x27;stale&#x27;, &#x27;Menghubungkan ke Google Sheets&amp;hellip;&#x27;);
   try {
-    const { rows: list, reportDateLabel, totalAll } = parsePiutangCsv(await fetchCsv(PIUTANG_CSV_URL));
-    if (list.length) applyPerfaktur(list, await fetchPerfaktur());
+    const { rows: list, reportDateLabel, totalAll } = parsePiutangCsv(await fetchCsv(PIUTANG_CSV_URL), await fetchPerFaktur(), await fetchDataLookup());
     if (list.length || totalAll &gt; 0) applyNewData(list, reportDateLabel, new Date());   // 0 faktur divisi ini = lunas semua (sheet tetap berisi divisi lain)
     else setSync(&#x27;stale&#x27;, &#x27;Sheet piutang terbaca kosong — menampilkan data terakhir.&#x27;);
   } catch (err) {
@@ -2273,101 +2359,112 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     return num(v);
   }
 
-  // Kolom sheet cabang yang dibaca (posisi lama, dipakai bila judul kolom tidak ditemukan):
-  // B=1 Customer, C=2 STNK a/n, D=3 NoRangka, G=6 No Polisi, I=8 Serah STNK, J=9 Nomor BPKB,
-  // K=10 Terima Tanggal (BPKB), O=14 Leasing, S=18 No. Bast, X=23 Serah Tanggal (BPKB).
-  // Salesman, Supervisor, Divisi dibaca otomatis dari sheet &quot;Data&quot; (dicocokkan lewat No. Bast).
-  // Umur (hari) dihitung otomatis: hari ini dikurangi Terima Tanggal BPKB; kolom Hari / Today / &lt;60Hr / &gt;60Hr / &gt;90Hr tidak dipakai lagi.
-
-  function normKey(v) { return String(v == null ? &quot;&quot; : v).replace(/\s+/g, &quot;&quot;).toUpperCase(); }
-  function hdrTxt(v) { return String(v == null ? &quot;&quot; : v).replace(/\[merged\]/ig, &quot;&quot;).replace(/\s+/g, &quot; &quot;).trim().toLowerCase(); }
-
-  // Letak kolom dicari dari judul kolom, jadi kolom lain boleh dihapus tanpa menggeser pembacaan
-  function mapCols(table) {
-    var M = { bast: 18, leasing: 14, serah: 23, salesF: -1, supF: -1, divF: -1 }, h = -1, i, j, a, b, n;
-    for (i = 0; i &lt; table.length &amp;&amp; i &lt; 15; i++) {
-      var r0 = table[i] || [];
-      if (r0.length &gt; 5 &amp;&amp; /^no$/.test(hdrTxt(r0[0]))) { h = i; break; }
-    }
-    if (h &lt; 0) return M;
-    a = table[h] || []; b = table[h + 1] || [];
-    n = Math.max(a.length, b.length);
-    var okBast = false, okLeas = false;
-    for (j = 0; j &lt; n; j++) {
-      var t1 = hdrTxt(a[j]), t2 = hdrTxt(b[j]);
-      if (!okBast &amp;&amp; (/^no\.?\s*bast/.test(t1) || /^no\.?\s*bast/.test(t2))) { M.bast = j; okBast = true; }
-      if (!okLeas &amp;&amp; (/^leasing/.test(t1) || /^leasing/.test(t2))) { M.leasing = j; okLeas = true; }
-      if (/^serah\s*ta/.test(t1) || /^serah\s*ta/.test(t2)) M.serah = j;      // yang paling kanan = Serah Tanggal BPKB
-      if (/^salesman/.test(t1) || /^salesman/.test(t2)) M.salesF = j;         // yang paling kanan = KODE=NAMA
-      if (/^supervisor/.test(t1) || /^supervisor/.test(t2)) M.supF = j;
-      if (/^divisi/.test(t1) || /^divisi/.test(t2)) M.divF = j;
-    }
-    return M;
+  // Kolom sheet cabang: B=1 Customer, C=2 STNK a/n, D=3 NoRangka, G=6 No Polisi, I=8 Serah STNK,
+  // J=9 Nomor BPKB, K=10 Terima Tanggal (BPKB), L=11 &lt;60Hr, M=12 &gt;60Hr, N=13 &gt;90Hr, O=14 Leasing,
+  // U=20 Salesman, V=21 Supervisor, X=23 Serah Tanggal, Y=24 Hari
+  // raw = isi sheet yang sama dalam bentuk angka asli (opsional), dipakai untuk membaca kolom Hari
+  // Terima Tanggal BPKB -&gt; waktu (ms, tanpa zona). Angka serial Excel (jalur xlsx) atau teks dd/mm/yyyy[ hh:mm[:ss]] / yyyy-mm-dd[ hh:mm] (jalur CSV).
+  function terimaMs(v) {
+    if (typeof v === &quot;number&quot;) return isFinite(v) &amp;&amp; v &gt; 20000 ? Math.round((v - 25569) * 86400000) : null;
+    var s = String(v == null ? &quot;&quot; : v).trim();
+    if (!s || s === &quot;-&quot;) return null;
+    var m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(s);
+    if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+    m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(s);
+    if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+    return null;
+  }
+  // Umur (hari) = hari ini (00:00) dikurangi Terima Tanggal, dibulatkan; kosong bila tanggal tidak ada / tidak terbaca
+  function umurAuto(v) {
+    var ms = terimaMs(v);
+    if (ms == null) return null;
+    var t = new Date();
+    return Math.round((Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) - ms) / 86400000);
   }
 
-  // Sheet &quot;Data&quot;: kolom BAST | Salesman | Supervisor | Divisi -&gt; peta per nomor BAST
+  // Kolom sheet cabang yang dicari lewat JUDUL (supaya kolom lain boleh dihapus): Leasing, No. Bast, Serah Tanggal (X), dan
+  // (hanya untuk cadangan bila sheet Data tidak terbaca) Salesman + Supervisor hasil VLOOKUP.
+  function bpkbCols(table) {
+    var col = { leasing: 14, bast: 18, serah: 23, sales: -1, spv: -1 };
+    for (var i = 0; i &lt; table.length &amp;&amp; i &lt; 20; i++) {
+      var r = table[i] || [];
+      if (String(r[0] == null ? &quot;&quot; : r[0]).trim().toLowerCase() !== &quot;no&quot; || String(r[1] == null ? &quot;&quot; : r[1]).toLowerCase().indexOf(&quot;customer&quot;) &lt; 0) continue;
+      var h = r.map(function (x) { return String(x == null ? &quot;&quot; : x).replace(/\s+/g, &quot; &quot;).trim().toLowerCase(); });
+      col = { leasing: -1, bast: -1, serah: -1, sales: -1, spv: -1 };
+      h.forEach(function (t, j) {
+        if (t === &quot;leasing&quot;) col.leasing = j;
+        else if (t === &quot;no. bast&quot; || t === &quot;no bast&quot; || t === &quot;nobast&quot;) col.bast = j;
+        else if (t === &quot;serah tanggal&quot; &amp;&amp; j &gt; 10) col.serah = j;
+        else if (t === &quot;supervisor&quot;) col.spv = j;
+      });
+      if (col.spv &gt; 0 &amp;&amp; h[col.spv - 1] === &quot;salesman&quot;) col.sales = col.spv - 1;
+      break;
+    }
+    return col;
+  }
+  function bastKey(v) { return String(v == null ? &quot;&quot; : v).replace(/\s+/g, &quot; &quot;).trim().toUpperCase(); }
+  // Nama divisi dari sheet Data -&gt; nama divisi dashboard (Gatsu / Gagak Hitam / Flamboyan); tak dikenal -&gt; &quot;&quot; (pakai nama sheet cabang)
+  function canonDiv(s) {
+    var l = String(s == null ? &quot;&quot; : s).trim().toLowerCase(), i;
+    for (i = 0; i &lt; DIVISIONS.length; i++) if (DIVISIONS[i].toLowerCase() === l) return DIVISIONS[i];
+    if (l.indexOf(&quot;gatsu&quot;) &gt; -1) return &quot;Gatsu&quot;;
+    if (l.indexOf(&quot;gagak&quot;) &gt; -1) return &quot;Gagak Hitam&quot;;
+    if (l.indexOf(&quot;flamboyan&quot;) &gt; -1) return &quot;Flamboyan&quot;;
+    return &quot;&quot;;
+  }
+  // Sheet &quot;Data&quot;: satu baris per No. BAST -&gt; Salesman (&quot;KODE=NAMA LENGKAP&quot;), Supervisor, Divisi. Kolom dicari lewat judul (cadangan: A, B, C, D).
   function buildLookup(rows) {
-    var map = {}, h = -1, ci = { s: 1, v: 2, d: 3, b: 0 }, i, j;
+    if (!rows || !rows.length) return null;
+    var iB = 0, iS = 1, iP = 2, iD = 3, i, j;
     for (i = 0; i &lt; rows.length &amp;&amp; i &lt; 10; i++) {
-      var r = rows[i] || [];
-      for (j = 0; j &lt; r.length; j++) { if (/^bast$/.test(hdrTxt(r[j]))) { h = i; break; } }
-      if (h &gt;= 0) {
-        ci.b = j;
-        for (j = 0; j &lt; r.length; j++) {
-          var t = hdrTxt(r[j]);
-          if (/^salesman/.test(t)) ci.s = j; else if (/^supervisor/.test(t)) ci.v = j; else if (/^divisi/.test(t)) ci.d = j;
-        }
-        break;
+      var h = (rows[i] || []).map(function (x) { return String(x == null ? &quot;&quot; : x).trim().toLowerCase(); });
+      if (h.indexOf(&quot;bast&quot;) &gt; -1 || h.indexOf(&quot;no. bast&quot;) &gt; -1) {
+        iB = Math.max(h.indexOf(&quot;bast&quot;), h.indexOf(&quot;no. bast&quot;));
+        if (h.indexOf(&quot;salesman&quot;) &gt; -1) iS = h.indexOf(&quot;salesman&quot;);
+        if (h.indexOf(&quot;supervisor&quot;) &gt; -1) iP = h.indexOf(&quot;supervisor&quot;);
+        if (h.indexOf(&quot;divisi&quot;) &gt; -1) iD = h.indexOf(&quot;divisi&quot;);
+        rows = rows.slice(i + 1); break;
       }
     }
-    for (i = h + 1; i &lt; rows.length; i++) {
-      var q = rows[i]; if (!q) continue;
-      var k = normKey(q[ci.b]);
-      if (!k || map[k]) continue;                       // BAST ganda: yang pertama dipakai
-      map[k] = { sales: cleanName(q[ci.s]), sup: String(q[ci.v] == null ? &quot;&quot; : q[ci.v]).trim(), div: String(q[ci.d] == null ? &quot;&quot; : q[ci.d]).trim() };
+    var map = {}, n = 0;
+    for (j = 0; j &lt; rows.length; j++) {
+      var r = rows[j], k = bastKey(r &amp;&amp; r[iB]);
+      if (!k) continue;
+      map[k] = { sales: cleanName(r[iS]), spv: String(r[iP] == null ? &quot;&quot; : r[iP]).trim(), div: String(r[iD] == null ? &quot;&quot; : r[iD]).trim() };
+      n++;
     }
-    return map;
+    return n ? map : null;
   }
-
-  // Waktu (ms) dari sel tanggal: angka serial Excel, &quot;dd/mm/yyyy[ jam:menit[:detik]]&quot; atau &quot;yyyy-mm-dd&quot;
-  function stampMs(v) {
-    if (typeof v === &quot;number&quot;) {
-      if (!isFinite(v) || !window.XLSX || !XLSX.SSF || !XLSX.SSF.parse_date_code) return null;
-      var q = XLSX.SSF.parse_date_code(v);
-      return q ? new Date(q.y, q.m - 1, q.d, q.H || 0, q.M || 0, Math.floor(q.S || 0)).getTime() : null;
-    }
-    v = String(v == null ? &quot;&quot; : v).trim();
-    if (!v) return null;
-    var m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(v);
-    if (m) { if (+m[2] &gt; 12 || +m[1] &gt; 31) return null; return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime(); }
-    m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(v);
-    return m ? new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0)).getTime() : null;
+  // Tiap unit ditempatkan di divisi hasil sheet Data (bila ada), selain itu di divisi sheet asalnya. parts = { divisi: [unit] } untuk sheet yang berhasil dibaca.
+  function assignDivisions(parts) {
+    var ok = {}, all = [], out = {};
+    Object.keys(parts).forEach(function (d) { ok[d] = true; });
+    Object.keys(parts).forEach(function (d) { parts[d].forEach(function (r) { r.div = (r.divL &amp;&amp; ok[r.divL]) ? r.divL : d; all.push(r); }); });
+    Object.keys(parts).forEach(function (d) { out[d] = all.filter(function (r) { return r.div === d; }); });
+    return out;
   }
-  function todayStartMs() { var t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime(); }
+  function cleanVal(v) { v = String(v == null ? &quot;&quot; : v).trim(); return v.charAt(0) === &quot;#&quot; ? &quot;&quot; : v; }
 
-  // raw = isi sheet yang sama dalam bentuk angka asli (opsional); lookup = peta dari sheet &quot;Data&quot; (opsional)
-  function extract(table, raw, ambilFn, lookup) {
-    var res = [], M = mapCols(table), t0 = todayStartMs();
+  function extract(table, raw, ambilFn, look) {
+    var res = [], cols = bpkbCols(table);
     table.forEach(function (c, ix) {
-      if (!c || c.length &lt;= M.leasing) return;
+      if (!c || c.length &lt;= cols.leasing || cols.leasing &lt; 0) return;
       if (!/^\s*\d+\s*$/.test(String(c[0]))) return;
-      if (String(c[M.leasing]).trim().toLowerCase() !== &quot;cash&quot;) return;
-      var rr = raw &amp;&amp; raw[ix];
-      var tm = stampMs(rr &amp;&amp; rr[10] !== undefined &amp;&amp; rr[10] !== &quot;&quot; ? rr[10] : c[10]);
-      var days = tm != null ? Math.round((t0 - tm) / 86400000) : null;
-      if (days != null &amp;&amp; days &lt; 0) days = 0;
-      var b = days == null ? &quot;&quot; : days &gt; 90 ? &quot;gt90&quot; : days &gt;= 60 ? &quot;gt60&quot; : &quot;lt60&quot;;
-      var L = lookup ? lookup[normKey(c[M.bast])] : null;
-      var sales = L ? L.sales : (M.salesF &gt;= 0 ? cleanName(c[M.salesF]) : &quot;&quot;);
-      var sup = L ? L.sup : (M.supF &gt;= 0 ? c[M.supF] : &quot;&quot;);
-      var dv = L &amp;&amp; L.div ? L.div : (M.divF &gt;= 0 ? String(c[M.divF] == null ? &quot;&quot; : c[M.divF]).trim() : &quot;&quot;);
+      if (String(c[cols.leasing]).trim().toLowerCase() !== &quot;cash&quot;) return;
+      // Umur dihitung otomatis: tanggal hari ini dikurangi Terima Tanggal BPKB (kolom K), dibulatkan. Kolom Hari, &lt;60Hr, &gt;60Hr, &gt;90Hr di sheet tidak dipakai lagi.
+      var rr = raw &amp;&amp; raw[ix], days = umurAuto(rr &amp;&amp; typeof rr[10] === &quot;number&quot; ? rr[10] : c[10]);
+      var b = &quot;&quot;;
+      if (days != null) b = days &gt; 90 ? &quot;gt90&quot; : days &gt;= 60 ? &quot;gt60&quot; : &quot;lt60&quot;;
+      // Salesman, Supervisor, Divisi: dari sheet Data (cocok No. BAST). Cadangan bila No. BAST tidak ada di Data / sheet Data tidak terbaca: kolom Salesman + Supervisor di sheet cabang bila masih ada.
+      var L = look &amp;&amp; cols.bast &gt; -1 ? look[bastKey(c[cols.bast])] : null;
+      var sal = L ? L.sales : (cols.sales &gt; -1 ? cleanVal(cleanName(c[cols.sales])) : &quot;&quot;), spv = L ? L.spv : (cols.spv &gt; -1 ? cleanVal(c[cols.spv]) : &quot;&quot;);
       res.push({
-        c: [c[1], c[2], c[3], c[6], &quot;Cash&quot;, sales, sup].map(function (x) { return String(x == null ? &quot;&quot; : x).trim(); }),
+        c: [c[1], c[2], c[3], c[6], &quot;Cash&quot;, sal, spv].map(function (x) { return String(x == null ? &quot;&quot; : x).trim(); }),
+        divL: L &amp;&amp; L.div ? canonDiv(L.div) : &quot;&quot;,
         days: days, b: b, blank: String(c[8] == null ? &quot;&quot; : c[8]).trim() === &quot;&quot;,
         terima: normDate(c[10]),
-        ambil: ambilFn ? ambilFn(ix, M.serah) : normStamp(c[M.serah]),
-        bpkb: String(c[9] == null ? &quot;&quot; : c[9]).trim(),
-        div: dv, miss: !L
+        ambil: ambilFn ? ambilFn(ix) : (cols.serah &gt; -1 ? normStamp(c[cols.serah]) : &quot;&quot;),
+        bpkb: String(c[9] == null ? &quot;&quot; : c[9]).trim()
       });
     });
     return res;
@@ -2409,7 +2506,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
   var data = {}, per = {}, perISO = {};
   DIVISIONS.forEach(function (d) { data[d] = []; per[d] = &quot;&quot;; perISO[d] = &quot;&quot;; });
   var active = DIVISIONS[0];
-  var liveOK = false, loaded = false, lastRead = 0, lookupOK = true;
+  var liveOK = false, loaded = false, lastRead = 0;
   var mcp = null, watching = false, inFlight = false, starting = false, directOn = false, manual = false;
   var toastT = null;
 
@@ -2447,16 +2544,15 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     setLive(&quot;ok&quot;, &quot;Live &amp;middot; tersinkron &lt;b&gt;&quot; + esc(stamp(ts)) + &quot;&lt;/b&gt; &amp;middot; otomatis tiap &quot; + REFRESH_TXT,
       &quot;\u2713 Semua data diperbarui \u2014 &quot; + nf.format(totalUnits()) + &quot; unit Cash cabang &quot; + DIVISIONS[0] + &quot;, &quot; + stampLong(ts));
     liveOK = true; loaded = true; lastRead = Date.now();
-    var miss = 0; DIVISIONS.forEach(function (d) { data[d].forEach(function (r) { if (r.miss) miss++; }); });
-    var note = !lookupOK ? &#x27; Sheet &quot;Data&quot; tidak terbaca: nama sales, supervisor dan divisi memakai kolom sheet cabang.&#x27; : (miss ? &quot; &quot; + nf.format(miss) + &#x27; unit tidak ditemukan di sheet &quot;Data&quot; (memakai kolom sheet cabang).&#x27; : &quot;&quot;);
-    if (note) { el(&quot;bar&quot;).textContent += note; el(&quot;bar&quot;).className = &quot;bar warn&quot;; }
     renderAll();
   }
 
   /* ---------- baca workbook (xlsx) dari Google Drive ---------- */
   // Kolom X &quot;Serah Tanggal&quot;: sel tanggal dibaca dari angka aslinya (tidak tergantung format tampilan), sel teks apa adanya
   function ambilCell(ws, r, col) {
-    var cell = ws[XLSX.utils.encode_cell({ r: r, c: col == null ? 23 : col })];
+    if (col == null) col = 23;
+    if (col &lt; 0) return &quot;&quot;;
+    var cell = ws[XLSX.utils.encode_cell({ r: r, c: col })];
     if (!cell || cell.v === undefined || cell.v === null || cell.v === &quot;&quot;) return &quot;&quot;;
     var looksDate = /^\s*\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{1,4}/.test(String(cell.w || &quot;&quot;));
     if (cell.t === &quot;n&quot; &amp;&amp; ((cell.z &amp;&amp; XLSX.SSF &amp;&amp; XLSX.SSF.is_date(cell.z)) || looksDate) &amp;&amp; XLSX.SSF &amp;&amp; XLSX.SSF.parse_date_code) {
@@ -2470,17 +2566,18 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
   }
 
   function handleWB(wb, ts) {
-    var got = {}, marks = {}, look = null, dws = wb.Sheets[&quot;Data&quot;];
-    if (dws) look = buildLookup(XLSX.utils.sheet_to_json(dws, { header: 1, raw: false, defval: &quot;&quot; }));
-    lookupOK = !!look;
+    var got = {}, marks = {};
+    var look = buildLookup(wb.Sheets[&quot;Data&quot;] ? XLSX.utils.sheet_to_json(wb.Sheets[&quot;Data&quot;], { header: 1, raw: false, defval: &quot;&quot; }) : null);
     DIVISIONS.forEach(function (d) {
       var ws = wb.Sheets[d];
       if (!ws) throw { code: &quot;struktur&quot;, message: &#x27;Sheet &quot;&#x27; + d + &#x27;&quot; tidak ditemukan di Google Sheet.&#x27; };
       var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: &quot;&quot;, dateNF: &quot;dd/mm/yyyy&quot; });
       var rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: &quot;&quot; });
       var r0 = XLSX.utils.decode_range(ws[&quot;!ref&quot;] || &quot;A1&quot;).s.r;
-      got[d] = extract(rows, rawRows, function (ix, col) { return ambilCell(ws, r0 + ix, col); }, look).map(function (r) { r.div = r.div || d; return r; }); marks[d] = findMarker(rows);
+      var sc = bpkbCols(rows).serah;
+      got[d] = extract(rows, rawRows, function (ix) { return ambilCell(ws, r0 + ix, sc); }, look); marks[d] = findMarker(rows);
     });
+    got = assignDivisions(got);
     var prev = perFor(active);
     DIVISIONS.forEach(function (d) { data[d] = got[d]; per[d] = marks[d]; perISO[d] = markerISO(marks[d]); });
     showFreshness(ts);
@@ -2554,23 +2651,25 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
   function directOnce() {
     if (inFlight) return Promise.resolve();
     inFlight = true; setLive(&quot;off busy&quot;, &quot;Membaca Google Sheet&quot;, &quot;Mengambil data dari Google Sheets...&quot;);
-    return fetch(gvizUrl(&quot;Data&quot;), { cache: &quot;no-store&quot; })
+    var lookP = fetch(gvizUrl(&quot;Data&quot;), { cache: &quot;no-store&quot; })
       .then(function (r) { if (!r.ok) throw new Error(&quot;HTTP &quot; + r.status); return r.text(); })
       .then(function (t) { if (/^\s*&lt;/.test(t)) throw new Error(&quot;bukan CSV&quot;); return buildLookup(parseCSV(t.replace(/^\uFEFF/, &quot;&quot;))); })
-      .catch(function () { return null; })
-      .then(function (look) { lookupOK = !!look; return Promise.all(DIVISIONS.map(function (d) {
+      .catch(function () { return null; });
+    return Promise.all(DIVISIONS.map(function (d) {
       return fetch(gvizUrl(d), { cache: &quot;no-store&quot; })
         .then(function (r) { if (!r.ok) throw new Error(&quot;HTTP &quot; + r.status); return r.text(); })
         .then(function (t) {
           if (/^\s*&lt;/.test(t)) throw new Error(&quot;bukan CSV&quot;);
           var rows = parseCSV(t.replace(/^\uFEFF/, &quot;&quot;));
-          return { d: d, rows: extract(rows, null, null, look).map(function (x) { x.div = x.div || d; return x; }), mark: findMarker(rows), ok: true };
+          return lookP.then(function (look) { return { d: d, rows: extract(rows, null, null, look), mark: findMarker(rows), ok: true }; });
         })
         .catch(function () { return { d: d, ok: false }; });
-    })); }).then(function (results) {
-      var okN = 0, fail = [];
+    })).then(function (results) {
+      var okN = 0, fail = [], okParts = {};
+      results.forEach(function (r) { if (r.ok) okParts[r.d] = r.rows; });
+      okParts = assignDivisions(okParts);
       results.forEach(function (r) {
-        if (r.ok) { data[r.d] = r.rows; per[r.d] = r.mark; perISO[r.d] = markerISO(r.mark); okN++; }
+        if (r.ok) { data[r.d] = okParts[r.d]; per[r.d] = r.mark; perISO[r.d] = markerISO(r.mark); okN++; }
         else fail.push(r.d);
       });
       if (okN === DIVISIONS.length) { showFreshness(Date.now()); if (manual) toast(&quot;Data diperbarui. &quot; + (perFor(active) || &quot;&quot;)); }
