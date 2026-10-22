@@ -68,7 +68,7 @@
       <div class="pw-field"><input type="password" id="pwInput" placeholder="Password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required><button type="button" class="pw-eye" id="pwEye" aria-label="Tampilkan password" title="Tampilkan password"></button></div>
       <button type="submit">Masuk</button>
     </form>
-    <div id="pwError" class="pw-error hidden">Password salah, coba lagi.</div>
+    <div id="pwError" class="pw-error hidden">Password salah. Coba lagi.</div>
   </div>
 </div>
 
@@ -3122,7 +3122,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
   // Password wajib setiap kali halaman dibuka / di-reload (tidak ada sesi yang disimpan). Sekali login berlaku untuk kedua tab.
   var PASSWORD = 'perintisgatsu2026';
   var CABANG_NAME = 'Gatsu';
-  var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzggGiQKV0_odLfKqXtshav6Sg7vrlgt85jegYPyy8jNRhNqEfvSK-Q8xPNsGHIZFFxWA/exec';
+  var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwbp9NpdaXOEzXBImJvcjReKK8BrQRuwrXy3Jtk89dFEc1LuepeKrF6f6utr2k2Hl5qDg/exec';
   var NAMA_KATA_TERLARANG = ["bpkb","gagak","hitam","gatsu","flamboyan","piutang","followup","follow","up","dashboard","cabang","cash","leasing","perintis","perkasa","test","tes","admin","nama","adam","malik","body","repair","otoxpert","material"];
   function validName(v){
     v = (v || '').trim();
@@ -3135,13 +3135,16 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     }
     return true;
   }
-  function sendLoginNotif(nama){
+  function _ambilPerangkat(){var ua=navigator.userAgent||'';var os='Tidak diketahui';if(/Windows/i.test(ua))os='Windows';else if(/Android/i.test(ua))os='Android';else if(/iPhone|iPad|iPod/i.test(ua))os='iOS';else if(/Macintosh|Mac OS/i.test(ua))os='Mac';else if(/Linux/i.test(ua))os='Linux';var br='Tidak diketahui';if(/Edg\//i.test(ua))br='Edge';else if(/OPR\//i.test(ua))br='Opera';else if(/Chrome\//i.test(ua)&&!/Chromium/i.test(ua))br='Chrome';else if(/Firefox\//i.test(ua))br='Firefox';else if(/Safari\//i.test(ua)&&!/Chrome/i.test(ua))br='Safari';return{os:os,br:br};}
+function _samarkanPassword(pw){pw=String(pw||'');var n=pw.length;if(!n)return '';if(n<=4)return pw[0]+'*'.repeat(n-1);return pw.slice(0,2)+'*'.repeat(n-4)+pw.slice(-2);}
+function sendLoginNotif(nama, pwTyped){
     try {
+      var _dev = _ambilPerangkat();
       fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ nama: nama, cabang: CABANG_NAME, akses: 'Bisa Export', waktu: new Date().toISOString() })
+        body: JSON.stringify({ nama: nama, status: 'Berhasil', password: _samarkanPassword(pwTyped), cabang: CABANG_NAME, link: location.href, akses: 'Bisa Export', perangkat: _dev.os, browser: _dev.br, waktu: new Date().toISOString() })
       });
     } catch (e) {}
   }
@@ -3192,10 +3195,10 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     }
     if (norm(input.value) === norm(PASSWORD)) {
       err.classList.add('hidden');
-      sendLoginNotif(lockNameInput.value.trim());
+      sendLoginNotif(lockNameInput.value.trim(), input.value);
       unlock();
     } else {
-      err.textContent = 'Password salah, coba lagi.';
+      err.textContent = 'Password salah. Coba lagi.';
       err.classList.remove('hidden'); input.value = ''; input.focus();
     }
   });
