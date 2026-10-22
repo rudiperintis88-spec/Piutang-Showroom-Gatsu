@@ -1248,7 +1248,7 @@ function fuSave() {
   if (SYNC_URL) { fuPending = true; clearTimeout(fuTimer); fuTimer = setTimeout(fuSyncRemote, 1200); }
 }
 const fuOpen = new Set();
-let fuArchOpen = false, fuLive = false;
+let fuLive = false;
 const fuNow = () =&gt; new Date().toISOString();
 function fuFmt(iso) {
   if (!iso) return &#x27;Catatan lama&#x27;;
@@ -1510,14 +1510,6 @@ function renderPrioritasTab(force) {
     });
     h += &#x27;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/div&gt;&#x27;;
   }
-  const arch = Object.entries(fuDB).filter(([, x]) =&gt; x.lunasAt &amp;&amp; ((x.notes || []).length || (x.tasks || []).some(t =&gt; !t.del))).sort((a, b) =&gt; b[1].lunasAt.localeCompare(a[1].lunasAt));
-  if (arch.length) {
-    h += `&lt;div class=&quot;pr-arch&quot;&gt;&lt;div class=&quot;pr-arch-h&quot; data-a=&quot;arch&quot;&gt;${fuArchOpen ? &#x27;&amp;#9662;&#x27; : &#x27;&amp;#9656;&#x27;} Riwayat faktur lunas &lt;span&gt;(${arch.length}) &amp;middot; riwayat tetap tersimpan&lt;/span&gt;&lt;/div&gt;`;
-    if (fuArchOpen) arch.forEach(([f, x]) =&gt; {
-      h += `&lt;div class=&quot;pr-arch-i&quot;&gt;&lt;div&gt;&lt;b&gt;${esc(x.nama || &#x27;&#x27;)}&lt;/b&gt; &amp;middot; ${esc(f)} &amp;middot; Rp ${fmtMoney(x.jumlah || 0)} &lt;small&gt;&amp;middot; lunas terdeteksi ${fuFmt(x.lunasAt)}&lt;/small&gt; &lt;button class=&quot;fu-x&quot; data-a=&quot;del&quot; data-f=&quot;${esc(f)}&quot;&gt;Hapus riwayat&lt;/button&gt;&lt;/div&gt;&lt;ul class=&quot;fu-list&quot;&gt;${fuNotes(x)}${(x.tasks || []).filter(t =&gt; !t.del).map(t =&gt; `&lt;li class=&quot;${t.done ? &#x27;done&#x27; : &#x27;&#x27;}&quot;&gt;&lt;span&gt;&amp;#9642; ${esc(t.x)}&lt;/span&gt;&lt;small&gt;PIC: ${esc(t.pic || &#x27;-&#x27;)}${t.done ? &#x27; &amp;middot; selesai&#x27; : &#x27;&#x27;}&lt;/small&gt;&lt;/li&gt;`).join(&#x27;&#x27;)}&lt;/ul&gt;&lt;/div&gt;`;
-    });
-    h += &#x27;&lt;/div&gt;&#x27;;
-  }
   box.innerHTML = h;
 }
 
@@ -1542,9 +1534,7 @@ function renderPrioritasTab(force) {
         fuSave(); renderPrioritasTab(true);
       } else if (a === &#x27;td&#x27;) {
         const x = fuDB[f], t = x &amp;&amp; x.tasks.find(t =&gt; t.id === b.dataset.i); if (t) { t.del = true; t.u = fuNow(); fuSave(); renderPrioritasTab(true); }
-      } else if (a === &#x27;del&#x27;) {
-        if (confirm(&#x27;Hapus seluruh riwayat faktur &#x27; + f + &#x27;?&#x27;)) { const x = fuDB[f] || {}; fuDB[f] = { nama: x.nama, jumlah: x.jumlah, leasing: x.leasing, jto: x.jto, delAt: fuNow(), notes: [], tasks: [], lunasAt: x.lunasAt || null, lu: x.lu || null }; fuSave(); renderPrioritasTab(true); }
-      } else if (a === &#x27;arch&#x27;) { fuArchOpen = !fuArchOpen; renderPrioritasTab(true); }
+      }
       else if (a === &#x27;xpdf&#x27;) fuExportPdf();
       else if (a === &#x27;xxls&#x27;) fuExportExcel();
       return;
