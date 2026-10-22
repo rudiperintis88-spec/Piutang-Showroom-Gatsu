@@ -49,12 +49,19 @@
 #lockName::placeholder{color:#9aa3b1 !important;opacity:1 !important;}
 #lockName:focus{outline:none !important;border-color:#6D28D9 !important;box-shadow:none !important;}
 </style>
+<style id="fieldfix">
+#lockName,#pwInput{width:100% !important;height:56px !important;box-sizing:border-box !important;padding:0 18px !important;margin:0 !important;font-size:16px !important;line-height:normal !important;text-align:left !important;border:1px solid #E4E8EE !important;border-radius:14px !important;background:#F5F6F8 !important;color:#171B21 !important;font-family:inherit !important;-webkit-appearance:none !important;appearance:none !important}
+#pwInput{padding-right:52px !important}
+#lockName::placeholder,#pwInput::placeholder{color:#9aa3b1 !important;opacity:1 !important;font-size:16px !important}
+#lockName:focus,#pwInput:focus{outline:none !important;box-shadow:none !important;border-color:#6D28D9 !important}
+#lockName{margin-bottom:0 !important}
+</style>
 </head>
 <body class="locked">
 
 <div id="passwordGate" class="pw-gate">
   <div class="pw-box">
-    <div class="pw-co">PT Perintis Perkasa, Medan</div>
+    <div class="pw-co"></div>
     <div class="pw-title">Gatsu</div>
     <form id="pwForm">
       <div class="pw-field"><input type="text" id="lockName" placeholder="Nama" autocomplete="off" required></div>
@@ -68,7 +75,7 @@
 <div class="tabbar" role="tablist">
   <button class="tab" role="tab" data-tab="piutang" aria-selected="true">Piutang</button>
   <button class="tab" role="tab" data-tab="bpkb" aria-selected="false">BPKB Cash</button>
-  <span class="brand">Gatsu &middot; PT Perintis Perkasa</span>
+  <span class="brand">Gatsu</span>
 </div>
 <div class="panels">
   <div class="panel active" id="p-piutang"><iframe id="f-piutang" title="Piutang Gatsu" data-srcdoc="&lt;!DOCTYPE html&gt;
@@ -605,7 +612,7 @@
   &lt;div class=&quot;header-banner&quot;&gt;
     &lt;div class=&quot;header-grid&quot;&gt;
       &lt;div class=&quot;header-left&quot;&gt;
-        &lt;p class=&quot;eyebrow&quot;&gt;PT Perintis Perkasa, Medan&lt;/p&gt;
+        &lt;p class=&quot;eyebrow&quot;&gt;&lt;/p&gt;
         &lt;h1 class=&quot;page-title&quot;&gt;Piutang Gatsu&lt;/h1&gt;
         &lt;p class=&quot;perdate&quot; id=&quot;perDateLabel&quot;&gt;&lt;/p&gt;
       &lt;/div&gt;
@@ -2068,7 +2075,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
 &lt;head&gt;
 &lt;meta charset=&quot;utf-8&quot;&gt;
 &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1, viewport-fit=cover&quot;&gt;
-&lt;title&gt;BPKB Belum Diserahkan (Cash) - Gatsu - PT Perintis Perkasa&lt;/title&gt;
+&lt;title&gt;BPKB Belum Diserahkan (Cash) - Gatsu&lt;/title&gt;
 &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot;&gt;
 &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.gstatic.com&quot; crossorigin&gt;
 &lt;link href=&quot;https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&amp;family=Inter:wght@400;500;600&amp;display=swap&quot; rel=&quot;stylesheet&quot;&gt;
@@ -2197,7 +2204,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
 &lt;main&gt;
   &lt;header class=&quot;top&quot;&gt;
     &lt;div&gt;
-      &lt;p class=&quot;company&quot;&gt;PT Perintis Perkasa, Medan &amp;middot; Cabang Gatsu&lt;/p&gt;
+      &lt;p class=&quot;company&quot;&gt;Cabang Gatsu&lt;/p&gt;
       &lt;h1&gt;BPKB Belum Diserahkan&lt;/h1&gt;
       &lt;div class=&quot;per&quot;&gt;&lt;span id=&quot;per&quot;&gt;Per : -&lt;/span&gt;&lt;span class=&quot;stale&quot; id=&quot;stale&quot; hidden&gt;belum hari ini&lt;/span&gt;&lt;/div&gt;
     &lt;/div&gt;
@@ -3090,7 +3097,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     doc.setFontSize(14);
     doc.text(sp.title, 40, 36);
     doc.setFontSize(9);
-    doc.text(&quot;PT Perintis Perkasa, Medan  |  &quot; + (perFor(active) || stamp(Date.now())) + &quot;  |  &quot; + (sp.numeric ? sp.rows.length - 1 + &quot; supervisor&quot; : sp.rows.length + &quot; unit&quot;), 40, 52);
+    doc.text(&quot;&quot; + (perFor(active) || stamp(Date.now())) + &quot;  |  &quot; + (sp.numeric ? sp.rows.length - 1 + &quot; supervisor&quot; : sp.rows.length + &quot; unit&quot;), 40, 52);
     var cs = { 0: { halign: &quot;right&quot;, cellWidth: 28 } };
     if (sp.numeric) { [2, 3, 4, 5, 6].forEach(function (i) { cs[i] = { halign: &quot;right&quot; }; }); }
     doc.autoTable({
@@ -3144,7 +3151,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ nama: nama, cabang: CABANG_NAME, waktu: new Date().toISOString() })
+        body: JSON.stringify({ nama: nama, cabang: CABANG_NAME, akses: 'Bisa Export', waktu: new Date().toISOString() })
       });
     } catch (e) {}
   }
