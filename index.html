@@ -1132,6 +1132,7 @@ function renderFollowupTab() {
   populateLeasingFilter();
   const tbody = document.getElementById(&#x27;followupBody&#x27;);
   tbody.innerHTML = &quot;&quot;;
+  pfShowNote();
 
   let list = rows.filter(r =&gt; {
     if (followupLeasingValue &amp;&amp; (r.leasing || &quot;-&quot;) !== followupLeasingValue) return false;
@@ -1884,43 +1885,118 @@ async function fetchDataLookup() {
 let pfLast = null;
 function pfKey(v) { return String(v == null ? &#x27;&#x27; : v).replace(/\s+/g, &#x27; &#x27;).trim().toUpperCase(); }
 function pfClean(v) { v = String(v == null ? &#x27;&#x27; : v).trim(); return /^#(N\/A|REF!|VALUE!|NAME\?|DIV\/0!|NULL!|NUM!|ERROR!)/i.test(v) || /^\\?-+$/.test(v) ? &#x27;&#x27; : v; }
+/* ===== Tgl Barcode &amp; Tgl Buat Tagihan dari sheet &quot;Data Per Faktur&quot; (dicocokkan lewat Faktur No.) =====
+   Kolom dicari lewat JUDUL: &quot;Faktur No.&quot; , &quot;Tgl Buat Tagihan&quot; , &quot;Tgl Barcode&quot; (urutan kolom bebas, judul boleh di baris 1-15). */
+let pfInfo = null, pfLastInfo = null, pfGoodUrl = &#x27;&#x27;;
+let pfStatus = { level: &#x27;warn&#x27;, text: &#x27;Tgl Barcode: membaca sheet &quot;Data Per Faktur&quot;…&#x27; };
+function pfNorm(c) { return String(c == null ? &#x27;&#x27; : c).toLowerCase().replace(/[^a-z0-9]+/g, &#x27; &#x27;).trim(); }
 function buildPerFaktur(rows) {
+  let partial = null;
   for (let i = 0; i &lt; rows.length &amp;&amp; i &lt; 15; i++) {
-    const r = rows[i] || [];
-    const hs = r.map(c =&gt; String(c == null ? &#x27;&#x27; : c).toLowerCase().replace(/\s+/g, &#x27; &#x27;).trim());
+    const raw = rows[i] || [];
+    const hs = raw.map(pfNorm), cp = hs.map(s =&gt; s.replace(/ /g, &#x27;&#x27;));
     let f = -1, t = -1, b = -1;
     hs.forEach((s, j) =&gt; { if (f &lt; 0 &amp;&amp; /faktur/.test(s) &amp;&amp; !/tgl|tanggal/.test(s)) f = j; });
     hs.forEach((s, j) =&gt; { if (t &lt; 0 &amp;&amp; /tagihan/.test(s) &amp;&amp; /tgl|tanggal|buat/.test(s)) t = j; });
     if (t &lt; 0) hs.forEach((s, j) =&gt; { if (t &lt; 0 &amp;&amp; /tagihan/.test(s)) t = j; });
-    hs.forEach((s, j) =&gt; { if (b &lt; 0 &amp;&amp; /bar(c|k)ode/.test(s.replace(/[^a-z]/g, &#x27;&#x27;)) &amp;&amp; /tgl|tanggal/.test(s)) b = j; });
-    if (b &lt; 0) hs.forEach((s, j) =&gt; { if (b &lt; 0 &amp;&amp; /bar(c|k)ode/.test(s.replace(/[^a-z]/g, &#x27;&#x27;))) b = j; });
+    // Tgl Barcode: judul persis &quot;Tgl Barcode&quot; didahulukan, lalu judul lain yang memuat &quot;barcode&quot;
+    cp.forEach((s, j) =&gt; { if (b &lt; 0 &amp;&amp; /^(tgl|tanggal)bar(c|k)ode$/.test(s)) b = j; });
+    if (b &lt; 0) cp.forEach((s, j) =&gt; { if (b &lt; 0 &amp;&amp; /bar(c|k)ode/.test(s) &amp;&amp; /tgl|tanggal/.test(s)) b = j; });
+    if (b &lt; 0) cp.forEach((s, j) =&gt; { if (b &lt; 0 &amp;&amp; /bar(c|k)ode/.test(s)) b = j; });
     if (f &lt; 0 || (t &lt; 0 &amp;&amp; b &lt; 0)) continue;
-    const map = {}; let n = 0;
-    for (let k = i + 1; k &lt; rows.length; k++) {
-      const row = rows[k], key = pfKey(row &amp;&amp; row[f]);
-      if (!key) continue;
-      map[key] = { tagih: t &gt; -1 ? pfClean(row[t]) : &#x27;&#x27;, barcode: b &gt; -1 ? pfClean(row[b]) : &#x27;&#x27; };
-      n++;
-    }
-    return n ? map : null;
+    const cand = { i, f, t, b, headers: raw.map(c =&gt; String(c == null ? &#x27;&#x27; : c).trim()).filter(Boolean) };
+    if (b &gt;= 0) return pfBuildMap(rows, cand);
+    if (!partial) partial = cand; // judul Tgl Barcode belum ketemu di baris ini; coba baris lain / varian baca lain
   }
-  return null;
+  return partial ? pfBuildMap(rows, partial) : null;
+}
+function pfBuildMap(rows, c) {
+  const map = {}; let n = 0, nb = 0;
+  for (let k = c.i + 1; k &lt; rows.length; k++) {
+    const row = rows[k], key = pfKey(row &amp;&amp; row[c.f]);
+    if (!key) continue;
+    const tg = c.t &gt; -1 ? pfClean(row[c.t]) : &#x27;&#x27;, bc = c.b &gt; -1 ? pfClean(row[c.b]) : &#x27;&#x27;, prev = map[key];
+    // faktur yang muncul lebih dari sekali: nilai yang terisi tidak ditimpa baris kosong
+    map[key] = { tagih: tg || (prev &amp;&amp; prev.tagih) || &#x27;&#x27;, barcode: bc || (prev &amp;&amp; prev.barcode) || &#x27;&#x27; };
+    if (!prev) n++;
+  }
+  if (!n) return null;
+  Object.keys(map).forEach(k =&gt; { if (map[k].barcode) nb++; });
+  pfInfo = { n, nb, hasBarcode: c.b &gt; -1, header: c.b &gt; -1 ? String(rows[c.i][c.b]).trim() : &#x27;&#x27;, headers: c.headers };
+  return map;
 }
 async function pfFetchRows(url) {
   const res = await fetch(url, { cache: &#x27;no-store&#x27; });
   if (!res.ok) throw new Error(&#x27;HTTP &#x27; + res.status);
   const t = await res.text();
   if (/^\s*&lt;/.test(t)) throw new Error(&#x27;bukan CSV&#x27;);
-  return parseCSVFull(t.replace(/^\uFEFF/, &#x27;&#x27;));
+  return parseCSVFull(t.replace(/^﻿/, &#x27;&#x27;));
 }
 async function fetchPerFaktur() {
-  const urls = PERFAKTUR_SHEETS.map(n =&gt; &#x27;https://docs.google.com/spreadsheets/d/&#x27; + PERFAKTUR_FILE_ID + &#x27;/gviz/tq?tqx=out:csv&amp;headers=0&amp;sheet=&#x27; + encodeURIComponent(n));
-  if (PERFAKTUR_PUB_GID) urls.push(PUB_BASE + &#x27;?gid=&#x27; + PERFAKTUR_PUB_GID + &#x27;&amp;single=true&amp;output=csv&#x27;);
-  for (const u of urls) {
-    try { const m = buildPerFaktur(await pfFetchRows(u)); if (m) { pfLast = m; return m; } }
-    catch (e) { console.warn(&#x27;Data PerFaktur belum terbaca:&#x27;, e); }
+  const gv = &#x27;https://docs.google.com/spreadsheets/d/&#x27; + PERFAKTUR_FILE_ID + &#x27;/gviz/tq?tqx=out:csv&amp;sheet=&#x27;;
+  const groups = []; // satu kelompok per sumber; bila sumber gagal diakses, varian headers lain dilewati
+  if (pfGoodUrl) groups.push([pfGoodUrl]);
+  if (PERFAKTUR_PUB_GID) groups.push([PUB_BASE + &#x27;?gid=&#x27; + PERFAKTUR_PUB_GID + &#x27;&amp;single=true&amp;output=csv&#x27;]);
+  // headers=0 dulu; Google kadang mengosongkan judul kolom tanggal pada varian ini, maka varian headers=1..3 dicoba bila kolom Tgl Barcode belum ketemu
+  PERFAKTUR_SHEETS.forEach(n =&gt; groups.push([&#x27;0&#x27;, &#x27;1&#x27;, &#x27;2&#x27;, &#x27;3&#x27;].map(h =&gt; gv + encodeURIComponent(n) + &#x27;&amp;headers=&#x27; + h)));
+  let partial = null, partialInfo = null, lastErr = &#x27;&#x27;, readOk = false;
+  for (const g of groups) {
+    for (const u of g) {
+      try {
+        const m = buildPerFaktur(await pfFetchRows(u));
+        readOk = true;
+        if (!m) { lastErr = &#x27;judul kolom Faktur No. / Tgl Buat Tagihan / Tgl Barcode tidak ditemukan&#x27;; continue; }
+        if (pfInfo.hasBarcode) {
+          pfLast = m; pfLastInfo = pfInfo; pfGoodUrl = u;
+          pfStatus = { level: &#x27;ok&#x27;, text: &#x27;Tgl Barcode dibaca dari sheet &quot;Data Per Faktur&quot;, kolom &quot;&#x27; + pfInfo.header + &#x27;&quot;&#x27; };
+          pfShowNote(); return m;
+        }
+        if (!partial) { partial = m; partialInfo = pfInfo; }
+      } catch (e) {
+        lastErr = String(e &amp;&amp; e.message || e); console.warn(&#x27;Data Per Faktur belum terbaca:&#x27;, u, e);
+        break;
+      }
+    }
   }
-  return pfLast; // gagal: pakai data terakhir yang berhasil; bila belum pernah berhasil -&gt; null (cadangan: kolom O/P Sheet1)
+  if (partial) {
+    pfLast = partial; pfLastInfo = partialInfo;
+    pfStatus = { level: &#x27;err&#x27;, text: &#x27;Sheet &quot;Data Per Faktur&quot; terbaca, tetapi kolom berjudul &quot;Tgl Barcode&quot; tidak ditemukan. Judul yang terbaca: &#x27; + partialInfo.headers.slice(0, 14).join(&#x27; | &#x27;) };
+    pfShowNote(); return partial;
+  }
+  if (pfLast) {
+    pfStatus = { level: &#x27;warn&#x27;, text: &#x27;Sheet &quot;Data Per Faktur&quot; gagal diperbarui (&#x27; + lastErr + &#x27;), memakai data terakhir yang berhasil dibaca&#x27; };
+    pfShowNote(); return pfLast;
+  }
+  pfStatus = { level: &#x27;err&#x27;, text: readOk
+    ? &#x27;Sheet &quot;Data Per Faktur&quot; terbaca tetapi &#x27; + lastErr + &#x27;. Tgl Barcode dikosongkan (tidak memakai kolom P Sheet1).&#x27;
+    : &#x27;Sheet &quot;Data Per Faktur&quot; tidak bisa dibaca (&#x27; + lastErr + &#x27;). Pastikan file Google Sheet dibagikan &quot;Siapa saja yang memiliki link&quot; (Viewer) dan nama sheet &quot;Data Per Faktur&quot;, atau isi PERFAKTUR_PUB_GID. Tgl Barcode dikosongkan (tidak memakai kolom P Sheet1).&#x27; };
+  pfShowNote(); return null; // Tgl Barcode hanya dari sheet Data Per Faktur: tanpa cadangan kolom P Sheet1
+}
+function pfShowNote() {
+  try {
+    let st; try { st = pfStatus; } catch (e) { return; } // dipanggil sebelum variabel status dibuat (render awal): lewati
+    const aC = document.getElementById(&#x27;fuCount&#x27;), aT = document.getElementById(&#x27;followupTable&#x27;);
+    if (!aC &amp;&amp; !aT) return;
+    let el = document.getElementById(&#x27;pfBarcodeNote&#x27;);
+    if (!el) {
+      el = document.createElement(&#x27;div&#x27;); el.id = &#x27;pfBarcodeNote&#x27;; el.style.cssText = &#x27;font-size:12px;margin:4px 0 8px;line-height:1.4&#x27;;
+      if (aC) aC.parentNode.insertBefore(el, aC.nextSibling);
+      else { const sc = aT.closest(&#x27;.table-scroll&#x27;) || aT; sc.parentNode.insertBefore(el, sc); }
+    }
+    let text = st.text, level = st.level;
+    if (level === &#x27;ok&#x27;) {
+      let list = null;
+      try { list = typeof fuAllRows !== &#x27;undefined&#x27; ? fuAllRows : (typeof rows !== &#x27;undefined&#x27; ? rows : null); } catch (e) { list = null; }
+      if (list &amp;&amp; list.length) {
+        const filled = list.filter(r =&gt; r &amp;&amp; r.tglBarcode &amp;&amp; r.tglBarcode !== &#x27;#N/A&#x27;).length;
+        text += &#x27; · &#x27; + filled + &#x27; dari &#x27; + list.length + &#x27; faktur punya Tgl Barcode&#x27;;
+        if (!filled &amp;&amp; pfLastInfo &amp;&amp; pfLastInfo.nb) { level = &#x27;err&#x27;; text += &#x27;. Tidak ada yang cocok dengan Faktur No. piutang, periksa penulisan Faktur No. di sheet Data Per Faktur&#x27;; }
+        else if (!filled) { level = &#x27;warn&#x27;; text += &#x27;. Kolom Tgl Barcode di sheet masih kosong semua&#x27;; }
+      }
+    }
+    el.textContent = text;
+    el.style.color = level === &#x27;ok&#x27; ? &#x27;var(--muted,#667085)&#x27; : (level === &#x27;warn&#x27; ? &#x27;#b54708&#x27; : &#x27;#b42318&#x27;);
+  } catch (e) { /* tampilan status tidak boleh mengganggu dashboard */ }
 }
 
 function detectDelimiter(text) {
@@ -1996,7 +2072,7 @@ function parsePiutangCsv(csv, pf, ds) {
       tglJto: csvIso(r[5], fmt), jumlah: cellNum(r[6]), type: D ? D.type : cellStr(r[8]),
       cara: (D &amp;&amp; D.cara) || cellStr(r[10]) || &#x27;-&#x27;, leasing: (D ? D.leasing : cellStr(r[11])) || &#x27;-&#x27;,
       salesman: nm(D ? D.sales : r[12]), supervisor: D ? D.spv : cellStr(r[13]),
-      tglTagih: pf ? dateOrText((L &amp;&amp; L.tagih) || &#x27;Belum Buat Tagihan&#x27;) : dateOrText(r[14]), tglBarcode: pf ? dateOrText(L ? L.barcode : &#x27;&#x27;) : dateOrText(r[15]),
+      tglTagih: pf ? dateOrText((L &amp;&amp; L.tagih) || &#x27;Belum Buat Tagihan&#x27;) : dateOrText(r[14]), tglBarcode: pf ? dateOrText(L ? L.barcode : &#x27;&#x27;) : null, // hanya dari sheet Data Per Faktur
       followup: fu === &#x27;#N/A&#x27; ? null : (fu || null),
     };
   });
