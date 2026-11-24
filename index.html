@@ -57,6 +57,15 @@
 </style>
 <style>:root,html,body{color-scheme:light only !important}</style>
 <style id="polos">:root{--bg:#FFFFFF !important;--grad:none !important}html,body{background:#FFFFFF !important}</style>
+<style id="mobile">
+@media (max-width:640px){
+  .brand{display:none}
+  .tabbar{padding:6px 8px 0;gap:2px}
+  .tab{padding:10px 12px;font-size:13px}
+  .pw-gate{padding:16px}
+  .pw-box{padding:26px 20px}
+}
+</style>
 </head>
 <body class="locked">
 
@@ -756,8 +765,7 @@
     &lt;div id=&quot;detailSections&quot;&gt;&lt;/div&gt;
   &lt;/div&gt;
 
-  &lt;footer&gt;Kategori dihitung otomatis dari Tgl. Jatuh Tempo setiap kali halaman ini dibuka &amp;mdash; angka &amp;ldquo;Hari&amp;rdquo; selalu mengikuti tanggal hari ini.&lt;br&gt;Versi build: 2026-09-30-v24 (dengan password, sinkron catatan aktif)&lt;/footer&gt;
-&lt;/div&gt;
+  &lt;/div&gt;
 
 &lt;script&gt;
 
@@ -2242,6 +2250,33 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
   }
 &lt;/style&gt;
 &lt;style&gt;:root,html,body{color-scheme:light only !important}&lt;/style&gt;
+&lt;style id=&quot;mobile&quot;&gt;
+@media (max-width:600px){
+  main{padding:16px 12px 32px}
+  h1{font-size:1.7rem;overflow-wrap:anywhere}
+  .top{gap:10px;padding-bottom:12px}
+  .sync,.sync-row{text-align:left;justify-content:flex-start}
+  .sync-text{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
+  .source{overflow-wrap:anywhere}
+  .bar{margin:14px 0;padding:10px 14px;overflow-wrap:anywhere}
+  .cards{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .card{padding:14px 16px}
+  .card.big{grid-column:1/-1;grid-row:auto;padding:20px}
+  .bigval{font-size:3rem;margin:8px 0 10px}
+  .val{font-size:1.3rem}
+  .lbl{margin-bottom:6px;font-size:13px}
+  .unit{font-size:13px}
+  .sechead{flex-wrap:wrap;gap:4px 12px;margin:22px 0 8px}
+  .sechead h2{font-size:1.4rem}
+  .tabs,.views{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab,.view{flex:0 0 auto;white-space:nowrap}
+  .view{padding:14px 14px 10px;font-size:.95rem}
+  .tools{gap:8px}
+  .tools input[type=&quot;search&quot;]{flex:1 1 100%}
+  thead th{padding:10px 8px}
+  tbody td{padding:8px}
+}
+&lt;/style&gt;
 &lt;/head&gt;
 &lt;body&gt;
 &lt;main&gt;
@@ -2325,8 +2360,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     &lt;/table&gt;
     &lt;div class=&quot;empty&quot; id=&quot;supEmpty&quot; hidden&gt;&lt;/div&gt;
   &lt;/div&gt;
-  &lt;p class=&quot;foot&quot;&gt;Umur (hari) dihitung otomatis: tanggal hari ini dikurangi Terima Tanggal BPKB (dibulatkan). Kategori &amp;lt; 60, &amp;gt; 60, dan &amp;gt; 90 hari mengikuti umur tersebut. Salesman, Supervisor, dan Divisi dibaca otomatis dari sheet Data berdasarkan No. BAST. Klik kartu ringkasan untuk menampilkan daftar unitnya. Tab Detail Per Supervisor menampilkan unit milik satu supervisor. Data diperbarui otomatis tiap 2 menit.&lt;/p&gt;
-&lt;/main&gt;
+  &lt;/main&gt;
 &lt;div class=&quot;toast&quot; id=&quot;toast&quot; role=&quot;status&quot;&gt;&lt;/div&gt;
 
 &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js&quot;&gt;&lt;/script&gt;
@@ -3303,6 +3337,39 @@ body.locked .wrap{display:none}
 .gbtn:disabled{opacity:.6;cursor:default}
 &lt;/style&gt;
 &lt;style&gt;:root,html,body{color-scheme:light only !important}&lt;/style&gt;
+&lt;style id=&quot;mobile&quot;&gt;
+@media (max-width:600px){
+  .wrap{padding:16px 14px 32px}
+  .top{gap:12px;padding-bottom:14px}
+  .top&gt;div:first-child{flex:1 1 100%;min-width:0}
+  h1{font-size:24px;overflow-wrap:anywhere}
+  .right{flex:1 1 100%;margin-left:0;align-items:flex-start;text-align:left;gap:8px;min-width:0}
+  .sync{flex-wrap:wrap;justify-content:flex-start;gap:8px;width:100%}
+  .live{white-space:normal;font-size:13px;flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
+  .src{font-size:13px;overflow-wrap:anywhere}
+  .refresh{font-size:15px;padding:8px 16px 8px 10px}
+  .tabs{gap:20px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab{font-size:17px;white-space:nowrap;flex:0 0 auto}
+  .cabtabs{flex-wrap:nowrap;overflow-x:auto}
+  .pill{flex:0 0 auto;padding:11px 18px;font-size:15px}
+  .sum{gap:12px;margin:16px 0 12px}
+  .hero{padding:20px;min-height:0}
+  .hero .big{font-size:44px;margin:10px 0}
+  .hero .s{font-size:14px}
+  .bk{grid-template-columns:1fr 1fr;gap:10px}
+  .bt{padding:14px}
+  .bt .h{font-size:13.5px}
+  .bt .v{font-size:19px}
+  .bt .c{font-size:12.5px}
+  .lg{font-size:13px}
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .filters input{grid-column:1/-1}
+  .filters select,.filters .btn{width:100%}
+  .filters .spacer{display:none}
+  .tw{max-height:65vh}
+  th,td{padding:6px 8px;font-size:12px}
+}
+&lt;/style&gt;
 &lt;/head&gt;
 &lt;body&gt;
 &lt;div class=&quot;wrap&quot;&gt;
