@@ -2,16 +2,15 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
+<meta name="color-scheme" content="light">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dashboard Gatsu - Piutang, BPKB Cash &amp; STNK</title>
 <style>
   :root { --bg:#F5F6F8; --bar:#FFFFFF; --surface:#FFFFFF; --surface-2:#FAFBFC; --ink:#1B2430; --muted:#667085; --line:#E4E7EC; --accent:#2563eb; --accent-soft:#eaf1ff; --err:#7A1815;
     --grad:linear-gradient(120deg,#FCF4F1 0%,#F6F2F8 50%,#F1F4FB 100%);
     box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg:#14171C; --bar:#1C2027; --surface:#1C2027; --surface-2:#20242C; --ink:#E7E9EC; --muted:#9AA3B2; --line:#2B303A; --accent:#7aa2ff; --accent-soft:#1d2840; --err:#f08a84; --grad:linear-gradient(120deg,#1C1E27 0%,#1E2029 55%,#1A2230 100%); }
-  }
-  :root[data-theme="dark"] { --bg:#14171C; --bar:#1C2027; --surface:#1C2027; --surface-2:#20242C; --ink:#E7E9EC; --muted:#9AA3B2; --line:#2B303A; --accent:#7aa2ff; --accent-soft:#1d2840; --err:#f08a84; --grad:linear-gradient(120deg,#1C1E27 0%,#1E2029 55%,#1A2230 100%); }
+  
+  
   *, *::before, *::after { box-sizing:border-box; }
   html, body { height:100%; margin:0; }
   body { display:flex; flex-direction:column; background:var(--bg); color:var(--ink);
@@ -56,6 +55,8 @@
 #lockName:focus,#pwInput:focus{outline:none !important;box-shadow:none !important;border-color:#6D28D9 !important}
 #lockName{margin-bottom:0 !important}
 </style>
+<style>:root,html,body{color-scheme:light only !important}</style>
+<style id="polos">:root{--bg:#FFFFFF !important;--grad:none !important}html,body{background:#FFFFFF !important}</style>
 </head>
 <body class="locked">
 
@@ -83,6 +84,7 @@
 &lt;html lang=&quot;id&quot;&gt;
 &lt;head&gt;
 &lt;meta charset=&quot;UTF-8&quot;&gt;
+&lt;meta name=&quot;color-scheme&quot; content=&quot;light&quot;&gt;
 &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1, viewport-fit=cover&quot;&gt;
 &lt;title&gt;Piutang Gatsu&lt;/title&gt;
 &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot;&gt;
@@ -125,39 +127,9 @@
     --header-grad: linear-gradient(120deg, #FCF4F1 0%, #F6F2F8 50%, #F1F4FB 100%);
   }
   :root:not([data-theme=&quot;light&quot;]) {
-    @media (prefers-color-scheme: dark) {
-      --bg: #14171C;
-      --surface: #1C2027;
-      --surface-2: #20242C;
-      --ink: #E7E9EC;
-      --muted: #9AA3B2;
-      --faint: #6B7280;
-      --border: #2B303A;
-      --cat-belum-wash: #2E2911;
-      --cat-7-wash: #10262C;
-      --cat-14-wash: #2E1815;
-      --cat-26-wash: #2E2911;
-      --cat-over-wash: #2A1211;
-      --cat-notdue-wash: #23262D;
-      --header-grad: linear-gradient(120deg, #1C1E27 0%, #1E2029 55%, #1A2230 100%);
-    }
+    
   }
-  :root[data-theme=&quot;dark&quot;] {
-    --bg: #14171C;
-    --surface: #1C2027;
-    --surface-2: #20242C;
-    --ink: #E7E9EC;
-    --muted: #9AA3B2;
-    --faint: #6B7280;
-    --border: #2B303A;
-    --cat-belum-wash: #2E2911;
-    --cat-7-wash: #10262C;
-    --cat-14-wash: #2E1815;
-    --cat-26-wash: #2E2911;
-    --cat-over-wash: #2A1211;
-    --cat-notdue-wash: #23262D;
-    --header-grad: linear-gradient(120deg, #1C1E27 0%, #1E2029 55%, #1A2230 100%);
-  }
+  
   html { scroll-padding-top: env(safe-area-inset-top, 0px); }
   * { box-sizing: border-box; }
   body {
@@ -604,6 +576,8 @@
   .fu-sync.err{color:var(--cat-over)}
   .fu-sync.off{color:var(--faint)}
 &lt;/style&gt;
+&lt;style&gt;:root,html,body{color-scheme:light only !important}&lt;/style&gt;
+&lt;style id=&quot;polos&quot;&gt;:root{--bg:#FFFFFF !important;--grad:none !important}html,body{background:#FFFFFF !important}&lt;/style&gt;
 &lt;/head&gt;
 &lt;body&gt;
 
@@ -2141,6 +2115,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
 &lt;html lang=&quot;id&quot;&gt;
 &lt;head&gt;
 &lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;color-scheme&quot; content=&quot;light&quot;&gt;
 &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1, viewport-fit=cover&quot;&gt;
 &lt;title&gt;BPKB Belum Diserahkan (Cash) - Gatsu&lt;/title&gt;
 &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot;&gt;
@@ -2266,6 +2241,7 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
     .cards { grid-template-columns: 1fr 1fr 1fr; }
   }
 &lt;/style&gt;
+&lt;style&gt;:root,html,body{color-scheme:light only !important}&lt;/style&gt;
 &lt;/head&gt;
 &lt;body&gt;
 &lt;main&gt;
@@ -3196,24 +3172,20 @@ document.getElementById(&#x27;tabs&#x27;).addEventListener(&#x27;click&#x27;, fu
 &lt;html lang=&quot;id&quot;&gt;
 &lt;head&gt;
 &lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;color-scheme&quot; content=&quot;light&quot;&gt;
+&lt;meta name=&quot;color-scheme&quot; content=&quot;light&quot;&gt;
 &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
 &lt;title&gt;STNK &amp; BPKB Belum Siap Gatsu&lt;/title&gt;
 &lt;link rel=&quot;preconnect&quot; href=&quot;https://fonts.googleapis.com&quot;&gt;
 &lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap&quot;&gt;
 &lt;style&gt;
-:root{
+:root{color-scheme:light;
   --bg:#ffffff; --card:#fff; --soft:#f4f5f7; --ink:#1b2330; --ink2:#4a5568; --muted:#8a93a3; --line:#e6e8ec;
   --accent:#2563eb; --accent-soft:#e8eefc; --bar:#6c8fe0;
   --serif:&quot;Fraunces&quot;,&quot;Newsreader&quot;,&quot;Source Serif 4&quot;,Georgia,&quot;Times New Roman&quot;,serif;
   --mono:&quot;JetBrains Mono&quot;,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --c0:#1a9c4a; --c1:#b45309; --c2:#c2410c; --c3:#dc2626; --crit-bg:#fdf1f1; --crit-line:#f5cccc;
   --ok-bg:#e3f4ea; --ok:#176b3a; --warn-bg:#fdf1d6; --warn:#8a5a00; --ser-bg:#fde5d3; --ser:#9a3d00; --bad-bg:#fbdcdc; --bad:#a11d1d;
-}
-@media (prefers-color-scheme:dark){
- :root{--bg:#10141b; --card:#171d27; --soft:#1c2330; --ink:#e8ecf2; --ink2:#b3bccb; --muted:#8792a5; --line:#2a3240;
-  --accent:#7ea6ff; --accent-soft:#223152; --bar:#5f86e0; --crit-bg:#3a1d1f; --crit-line:#5c2a2c;
-  --c0:#4cd07f; --c1:#f0b04c; --c2:#f58a52; --c3:#ff7b7b;
-  --ok-bg:#16382a; --ok:#7fd8a3; --warn-bg:#3d3216; --warn:#f0c765; --ser-bg:#44291a; --ser:#f5a974; --bad-bg:#491f1f; --bad:#ff9b9b;}
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,&quot;Segoe UI&quot;,Roboto,sans-serif}
@@ -3330,6 +3302,7 @@ body.locked .wrap{display:none}
 .gbtn:hover{opacity:.92}
 .gbtn:disabled{opacity:.6;cursor:default}
 &lt;/style&gt;
+&lt;style&gt;:root,html,body{color-scheme:light only !important}&lt;/style&gt;
 &lt;/head&gt;
 &lt;body&gt;
 &lt;div class=&quot;wrap&quot;&gt;
@@ -3569,8 +3542,10 @@ function startApp(){
   setInterval(()=&gt;{ if(!document.hidden) loadAll(); }, REFRESH_MS);
 }
 
-let __started=false;
-window.__unlock=function(){ if(__started) return; __started=true; startApp(); };
+window.__unlock=function(){};
+function __showErr(m){ var d=document.createElement(&#x27;div&#x27;); d.style.cssText=&#x27;padding:12px;margin:12px;border:1px solid #f5cccc;background:#fdf1f1;color:#a11d1d;font:13px/1.4 monospace;white-space:pre-wrap&#x27;; d.textContent=&#x27;Gagal menampilkan dashboard: &#x27;+m; document.body.insertBefore(d,document.body.firstChild); }
+window.addEventListener(&#x27;error&#x27;,function(e){ __showErr(e.message+&#x27; (baris &#x27;+e.lineno+&#x27;)&#x27;); });
+try{ startApp(); }catch(e){ __showErr(String(e&amp;&amp;e.message||e)); }
 &lt;/script&gt;
 &lt;/body&gt;
 &lt;/html&gt;
@@ -3644,8 +3619,8 @@ function sendLoginNotif(nama, pwTyped, loc){
   function load(name) {
     var f = document.getElementById('f-' + name);
     if (f && f.hasAttribute('data-srcdoc')) {
-      if (name === 'stnk') f.addEventListener('load', function () { try { f.contentWindow.__unlock(); } catch (e) {} }, { once: true });
       f.setAttribute('srcdoc', f.getAttribute('data-srcdoc')); f.removeAttribute('data-srcdoc');
+      if (name === 'stnk') { var tries = 0, iv = setInterval(function () { try { if (f.contentWindow && f.contentWindow.__unlock) { f.contentWindow.__unlock(); clearInterval(iv); } } catch (e) {} if (++tries > 100) clearInterval(iv); }, 100); }
     }
   }
   function show(name) {
@@ -3657,7 +3632,7 @@ function sendLoginNotif(nama, pwTyped, loc){
   }
   tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.dataset.tab); }); });
 
-  function unlock() { unlocked = true; gate.classList.add('hidden'); document.body.classList.remove('locked'); load(current); }
+  function unlock() { unlocked = true; window.__gatsuOK = true; gate.classList.add('hidden'); document.body.classList.remove('locked'); load(current); }
   function lock() {
     // kembali ke kondisi terkunci dan buang isi dashboard dari layar
     unlocked = false; location.reload();
